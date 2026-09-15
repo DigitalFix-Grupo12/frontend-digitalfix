@@ -1,7 +1,7 @@
 <h2>Reportería (últimas 24h)</h2>
-<p *ngIf="error" class="error">{{ error }}</p>
-<ul *ngIf="kpis">
-  <li>Órdenes por hora: {{ kpis.ordenesPorHora }}</li>
-  <li>Tiempo de resolución promedio: {{ kpis.tiempoResolucionPromedioMin }} min</li>
-  <li>Estados activos: {{ kpis.estadosActivos }}</li>
+<p *ngIf="error()" class="error">{{ error() }}</p>
+<ul *ngIf="kpis() as k">
+  <li>Órdenes por hora: {{ k.ordenesPorHora }}</li>
+  <li>Tiempo de resolución promedio: {{ k.tiempoResolucionPromedioMin }} min</li>
+  <li>Estados activos: {{ k.estadosActivos }}</li>
 </ul>

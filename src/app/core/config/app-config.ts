@@ -12,17 +12,16 @@
 export const appConfig = {
   azureAd: {
     // Application (client) ID del registro SPA "digitalfix-frontend"
-    clientId: 'REEMPLAZA_CON_TU_SPA_CLIENT_ID',
+    clientId: '3ac527f1-f433-4c0c-b518-aa0b5946294a',
     // Directory (tenant) ID de tu tenant Entra ID
-    tenantId: 'REEMPLAZA_CON_TU_TENANT_ID',
+    tenantId: 'ac1c32f1-bc10-4ded-b8c0-102ac9a1fd68',
     // URIs de redirección registradas en el App Registration SPA
     redirectUri: 'http://localhost:4200',
     postLogoutRedirectUri: 'http://localhost:4200',
   },
   api: {
     // Application ID URI del registro de la API "digitalfix-api" (ver PowerShell)
-    // Ej: api://11111111-2222-3333-4444-555555555555
-    scope: 'api://REEMPLAZA_CON_TU_API_CLIENT_ID/access_as_user',
+    scope: 'api://fb8ea665-ee45-4790-8112-eade3bd230e5/access_as_user',
     // Base URL del BFF. En local: http://localhost:8080
     // En AWS: la URL de tu API Gateway (HTTP API) + stage
     baseUrl: 'http://localhost:8080',

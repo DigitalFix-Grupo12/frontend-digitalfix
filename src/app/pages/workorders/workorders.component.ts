@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
@@ -15,9 +15,9 @@ export class WorkordersComponent implements OnInit {
   private fb = inject(FormBuilder);
   authService = inject(AuthService);
 
-  orders: WorkOrder[] = [];
-  loading = false;
-  error: string | null = null;
+  orders = signal<WorkOrder[]>([]);
+  loading = signal(false);
+  error = signal<string | null>(null);
 
   readonly nextStatus: Record<WorkOrderStatus, WorkOrderStatus | null> = {
     CREADA: 'ASIGNADA',
@@ -38,17 +38,16 @@ export class WorkordersComponent implements OnInit {
   }
 
   reload(): void {
-    this.loading = true;
-    this.error = null;
+    this.loading.set(true);
+    this.error.set(null);
     this.workordersService.list().subscribe({
       next: (orders) => {
-        this.orders = orders;
-        this.loading = false;
+        this.orders.set(orders);
+        this.loading.set(false);
       },
       error: (err) => {
-        // El BFF responde 401/403 si el token es inválido o el rol no autoriza
-        this.error = `No se pudo cargar (HTTP ${err.status}): ${err.error?.message ?? err.message}`;
-        this.loading = false;
+        this.error.set(`No se pudo cargar (HTTP ${err.status}): ${err.error?.message ?? err.message}`);
+        this.loading.set(false);
       },
     });
   }
@@ -63,7 +62,7 @@ export class WorkordersComponent implements OnInit {
           this.form.reset();
           this.reload();
         },
-        error: (err) => (this.error = `No se pudo crear (HTTP ${err.status})`),
+        error: (err) => this.error.set(`No se pudo crear (HTTP ${err.status})`),
       });
   }
 
@@ -72,7 +71,7 @@ export class WorkordersComponent implements OnInit {
     if (!next || !order.id) return;
     this.workordersService.updateStatus(order.id, next).subscribe({
       next: () => this.reload(),
-      error: (err) => (this.error = `No se pudo cambiar el estado (HTTP ${err.status})`),
+      error: (err) => this.error.set(`No se pudo cambiar el estado (HTTP ${err.status})`),
     });
   }
 

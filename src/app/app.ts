@@ -21,21 +21,28 @@ export class App implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   ngOnInit(): void {
+    // provideAppInitializer ya corrió instance.initialize() (y
+    // handleRedirectPromise() si veníamos de un login) ANTES de que este
+    // componente exista, así que si hay una cuenta activa ya podemos pedir
+    // roles ahora mismo -- no hace falta esperar un evento que puede haber
+    // ocurrido antes de que nos suscribiéramos a él.
+    if (this.authService.isLoggedIn()) {
+      void this.authService.refreshRoles();
+    }
+
+    // Igual escuchamos futuros logins/logouts que ocurran DESPUÉS de que
+    // el componente ya existe (ej: el usuario hace clic en "Iniciar sesión"
+    // sin recargar la página completa).
     this.msalBroadcastService.msalSubject$
       .pipe(
         takeUntil(this.destroy$),
-        filter(
-          (msg: EventMessage) =>
-            msg.eventType === EventType.INITIALIZE_END ||
-            msg.eventType === EventType.LOGIN_SUCCESS
-        )
+        filter((msg: EventMessage) => msg.eventType === EventType.LOGIN_SUCCESS)
       )
       .subscribe((result: EventMessage) => {
-        if (result.eventType === EventType.LOGIN_SUCCESS) {
-          const payload = result.payload as AuthenticationResult;
-          this.authService.getActiveAccount(); // fuerza refresco de cuenta activa
-          void payload;
-        }
+        const payload = result.payload as AuthenticationResult;
+        this.authService.getActiveAccount();
+        void payload;
+        void this.authService.refreshRoles();
       });
   }
 

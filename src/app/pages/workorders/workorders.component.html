@@ -1,7 +1,7 @@
 <h2>Órdenes de trabajo</h2>
 
-<p *ngIf="error" class="error">{{ error }}</p>
-<p *ngIf="loading">Cargando...</p>
+<p *ngIf="error()" class="error">{{ error() }}</p>
+<p *ngIf="loading()">Cargando...</p>
 
 <form *ngIf="canCreate()" [formGroup]="form" (ngSubmit)="create()" class="new-order">
   <input formControlName="descripcion" placeholder="Descripción del trabajo" />
@@ -9,12 +9,12 @@
   <button type="submit" [disabled]="form.invalid">Crear orden</button>
 </form>
 
-<table *ngIf="!loading">
+<table *ngIf="!loading()">
   <thead>
     <tr><th>ID</th><th>Descripción</th><th>Cliente</th><th>Estado</th><th *ngIf="canAdvance()"></th></tr>
   </thead>
   <tbody>
-    <tr *ngFor="let o of orders">
+    <tr *ngFor="let o of orders()">
       <td>{{ o.id }}</td>
       <td>{{ o.descripcion }}</td>
       <td>{{ o.clienteId }}</td>
