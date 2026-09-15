@@ -1,0 +1,8 @@
+<h2>Catálogo técnico</h2>
+<p *ngIf="error" class="error">{{ error }}</p>
+<table>
+  <thead><tr><th>ID</th><th>Servicio</th><th>Stock</th><th>Tarifa</th></tr></thead>
+  <tbody>
+    <tr *ngFor="let i of items"><td>{{ i.id }}</td><td>{{ i.nombre }}</td><td>{{ i.stock }}</td><td>{{ i.tarifa }}</td></tr>
+  </tbody>
+</table>

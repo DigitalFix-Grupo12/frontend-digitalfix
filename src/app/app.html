@@ -1,0 +1,25 @@
+<header class="topbar">
+  <h1>DigitalFix</h1>
+
+  <nav *ngIf="authService.isLoggedIn()">
+    <a routerLink="/dashboard">Dashboard</a>
+    <a routerLink="/workorders" *ngIf="authService.hasRole('Admin','Supervisor','Cliente')">Órdenes de trabajo</a>
+    <a routerLink="/catalog" *ngIf="authService.hasRole('Admin','Supervisor')">Catálogo</a>
+    <a routerLink="/reports" *ngIf="authService.hasRole('Admin')">Reportería</a>
+    <a routerLink="/audit" *ngIf="authService.hasRole('Admin','Auditor')">Auditoría</a>
+  </nav>
+
+  <div class="session">
+    <ng-container *ngIf="authService.isLoggedIn(); else loggedOut">
+      <span>{{ authService.getDisplayName() }} ({{ authService.getRoles().join(', ') || 'sin rol asignado' }})</span>
+      <button (click)="logout()">Cerrar sesión</button>
+    </ng-container>
+    <ng-template #loggedOut>
+      <button (click)="login()">Iniciar sesión con Microsoft</button>
+    </ng-template>
+  </div>
+</header>
+
+<main>
+  <router-outlet></router-outlet>
+</main>

@@ -1,0 +1,10 @@
+<h2>Dashboard</h2>
+<p>Hola {{ authService.getDisplayName() }}.</p>
+
+<ng-container [ngSwitch]="true">
+  <p *ngSwitchCase="authService.hasRole('Admin')">Vista Admin: aquí van los KPIs de la red (ver /reports).</p>
+  <p *ngSwitchCase="authService.hasRole('Supervisor')">Vista Supervisor: órdenes por asignar y en terreno.</p>
+  <p *ngSwitchCase="authService.hasRole('Cliente')">Vista Cliente: tus últimas órdenes y su estado.</p>
+  <p *ngSwitchCase="authService.hasRole('Auditor')">Vista Auditor: accede a /audit para el timeline de eventos.</p>
+  <p *ngSwitchDefault>Tu cuenta no tiene un rol asignado en Entra ID. Contacta al administrador.</p>
+</ng-container>

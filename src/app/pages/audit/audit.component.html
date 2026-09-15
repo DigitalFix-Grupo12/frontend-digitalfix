@@ -1,0 +1,8 @@
+<h2>Auditoría · Timeline de eventos</h2>
+<p *ngIf="error" class="error">{{ error }}</p>
+<table>
+  <thead><tr><th>ID</th><th>Usuario</th><th>Acción</th><th>Fecha</th></tr></thead>
+  <tbody>
+    <tr *ngFor="let e of events"><td>{{ e.id }}</td><td>{{ e.usuario }}</td><td>{{ e.accion }}</td><td>{{ e.fecha }}</td></tr>
+  </tbody>
+</table>
