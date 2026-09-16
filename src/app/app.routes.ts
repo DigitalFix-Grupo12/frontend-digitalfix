@@ -9,6 +9,7 @@ import { WorkorderDetailComponent } from './pages/workorder-detail/workorder-det
 import { CatalogComponent } from './pages/catalog/catalog.component';
 import { ReportsComponent } from './pages/reports/reports.component';
 import { AuditComponent } from './pages/audit/audit.component';
+import { SessionComponent } from './pages/session/session.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent },
@@ -47,6 +48,12 @@ export const routes: Routes = [
     component: AuditComponent,
     canActivate: [MsalGuard, roleGuard],
     data: { roles: ['Admin', 'Auditor'] },
+  },
+
+  {
+    path: 'session',
+    component: SessionComponent,
+    canActivate: [MsalGuard],
   },
 
   { path: '', redirectTo: 'dashboard', pathMatch: 'full' },

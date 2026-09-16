@@ -13,8 +13,10 @@ export const appConfig = {
     // Directory (tenant) ID de tu tenant Entra ID
     tenantId: 'ac1c32f1-bc10-4ded-b8c0-102ac9a1fd68',
     // URIs de redirección registradas en el App Registration SPA
-    redirectUri: 'http://localhost:4200',
-    postLogoutRedirectUri: 'http://localhost:4200',
+    // Se usa el origen actual: http://localhost:4200 en desarrollo y la URL
+    // de AWS Amplify en la nube (ambas registradas en el App Registration SPA).
+    redirectUri: window.location.origin,
+    postLogoutRedirectUri: window.location.origin,
   },
   api: {
     // Application ID URI del registro de la API "digitalfix-api" (ver PowerShell)

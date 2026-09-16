@@ -25,6 +25,9 @@
         <a routerLink="/audit" routerLinkActive="active" *ngIf="authService.hasRole('Admin','Auditor')">
           <span class="nav-dot" aria-hidden="true"></span>Auditoría
         </a>
+        <a routerLink="/session" routerLinkActive="active">
+          <span class="nav-dot" aria-hidden="true"></span>Mi sesión
+        </a>
       </nav>
 
       <div class="account">
