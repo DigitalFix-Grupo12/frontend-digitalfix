@@ -19,9 +19,8 @@ export const appConfig = {
   api: {
     // Application ID URI del registro de la API "digitalfix-api" (ver PowerShell)
     scope: 'api://fb8ea665-ee45-4790-8112-eade3bd230e5/access_as_user',
-    // TEMPORAL: BFF local mientras probamos la nueva arquitectura de
-    // microservicios. Antes de la entrega final, volver a la URL del
-    // API Gateway (https://7s6qn2mb8h.execute-api.us-east-1.amazonaws.com).
-    baseUrl: 'http://localhost:8080',
+    // AWS API Gateway (HTTP API) -> BFF en EC2 -> microservicios.
+    // Para probar contra un BFF local usar 'http://localhost:8080'.
+    baseUrl: 'https://7s6qn2mb8h.execute-api.us-east-1.amazonaws.com',
   },
 };
