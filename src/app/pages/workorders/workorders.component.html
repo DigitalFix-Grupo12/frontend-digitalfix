@@ -1,15 +1,23 @@
 <header class="page-head fade-in">
   <div>
     <div class="eyebrow"><app-icon name="wrench" [size]="14" /> Operación</div>
-    <h1>{{ isStaff() ? 'Órdenes de trabajo' : 'Mis órdenes de trabajo' }}</h1>
-    <p>Creada → Asignada → En desplazamiento → En ejecución → Cerrada</p>
+    <h1>{{ isStaff() ? 'Órdenes de trabajo' : 'Mis órdenes' }}</h1>
+    <p>
+      @if (isStaff()) {
+        Cada orden avanza de izquierda a derecha. Usa el botón de cada tarjeta para pasarla a la siguiente etapa.
+      } @else {
+        Aquí ves en qué etapa está cada una de tus solicitudes.
+      }
+    </p>
   </div>
   <div class="actions">
-    <button class="btn btn--ghost" (click)="reload()" [disabled]="loading()">
-      <app-icon name="refresh" [size]="16" /> Actualizar
-    </button>
-    <button class="btn btn--primary" (click)="openDrawer()">
-      <app-icon name="plus" [size]="16" /> Nueva orden
+    <div class="input-wrap" style="min-width:240px">
+      <app-icon name="search" [size]="16" />
+      <input class="input" placeholder="Buscar orden, cliente o técnico"
+             [value]="search()" (input)="search.set($any($event.target).value)" />
+    </div>
+    <button class="icon-btn" (click)="reload()" [disabled]="loading()" title="Actualizar" aria-label="Actualizar">
+      <app-icon name="refresh" />
     </button>
   </div>
 </header>
@@ -18,135 +26,107 @@
   <div class="alert alert--error"><app-icon name="alert" /><div>{{ error() }}</div></div>
 }
 
-<section class="card fade-in">
-  <div class="toolbar">
-    <div class="segmented" role="tablist">
-      @for (f of filters; track f.key) {
-        <button [class.on]="filter() === f.key" (click)="filter.set(f.key)" role="tab">
-          {{ f.label }} <span class="count">{{ counts()[f.key] ?? 0 }}</span>
-        </button>
-      }
-    </div>
-    <div class="grow" style="flex:1"></div>
-    <div class="input-wrap" style="min-width:260px">
-      <app-icon name="search" [size]="16" />
-      <input class="input" placeholder="Buscar por descripción, cliente, técnico o #ID"
-             [value]="search()" (input)="search.set($any($event.target).value)" />
-    </div>
-  </div>
+<!-- Crear orden: un solo formulario, siempre visible -->
+<form class="card quick-create fade-in" (submit)="$event.preventDefault(); create()">
+  <span class="kpi-icon kpi-icon--amber"><app-icon name="plus" /></span>
+  <input class="input" style="flex:2;min-width:220px" maxlength="500"
+         placeholder="¿Qué hay que reparar? Ej: corte de luz en calle Los Olmos 123"
+         [value]="desc()" (input)="desc.set($any($event.target).value)" />
+  @if (isStaff()) {
+    <input class="input" style="flex:1;min-width:160px" placeholder="Cliente (correo o ID)"
+           [value]="cliente()" (input)="cliente.set($any($event.target).value)" />
+  }
+  <button class="btn btn--primary" type="submit" [disabled]="!canCreate() || saving()">
+    {{ saving() ? 'Creando…' : 'Crear orden' }}
+  </button>
+</form>
 
-  <div class="table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th class="sortable" (click)="sort('id')">Orden <span class="sort-arrow">{{ arrow('id') }}</span></th>
-          @if (isStaff()) {
-            <th class="sortable" (click)="sort('clienteId')">Cliente <span class="sort-arrow">{{ arrow('clienteId') }}</span></th>
-          }
-          <th>Técnico</th>
-          <th>Progreso</th>
-          <th class="sortable" (click)="sort('status')">Estado <span class="sort-arrow">{{ arrow('status') }}</span></th>
-          @if (isStaff()) { <th style="text-align:right">Acción</th> }
-        </tr>
-      </thead>
-      <tbody>
+<!-- Tablero -->
+<section class="board fade-in">
+  @for (col of columns; track col.status) {
+    <div class="lane">
+      <div class="lane-head">
+        <span class="lane-icon lane-icon--{{ col.tone }}"><app-icon [name]="col.icon" [size]="16" /></span>
+        <div style="flex:1;min-width:0">
+          <div class="lane-title">{{ col.title }}</div>
+          <div class="lane-hint">{{ col.hint }}</div>
+        </div>
+        <span class="lane-count">{{ (byStatus()[col.status] ?? []).length }}</span>
+      </div>
+
+      <div class="lane-body">
         @if (loading()) {
-          @for (i of [1, 2, 3, 4]; track i) {
-            <tr><td [attr.colspan]="isStaff() ? 6 : 4"><div class="skeleton" style="height:18px"></div></td></tr>
-          }
+          <div class="skeleton" style="height:96px;border-radius:12px"></div>
         } @else {
-          @for (o of visible(); track o.id) {
-            <tr class="clickable" (click)="open(o)">
-              <td>
-                <div style="display:flex;gap:12px;align-items:center">
-                  <span class="id">#{{ o.id }}</span>
-                  <div>
-                    <div class="title">{{ o.descripcion }}</div>
-                    <div class="sub">Creada {{ timeAgo(o.createdAt) }}</div>
-                  </div>
-                </div>
-              </td>
-              @if (isStaff()) { <td><span class="code-pill">{{ o.clienteId }}</span></td> }
-              <td>
+          @for (o of byStatus()[col.status] ?? []; track o.id) {
+            <article class="ticket" [class.busy]="busyId() === o.id">
+              <button class="ticket-main" (click)="open(o)" title="Ver detalle">
+                <span class="ticket-id">#{{ o.id }} · {{ timeAgo(o.createdAt) }}</span>
+                <span class="ticket-title">{{ o.descripcion }}</span>
+              </button>
+
+              <div class="ticket-meta">
+                @if (isStaff()) {
+                  <span><app-icon name="user" [size]="13" /> {{ o.clienteId }}</span>
+                }
                 @if (o.tecnicoId) {
-                  <span style="display:inline-flex;gap:6px;align-items:center"><app-icon name="user" [size]="15" /> {{ o.tecnicoId }}</span>
-                } @else { <span class="faint">Sin asignar</span> }
-              </td>
-              <td>
-                <div class="steps-mini" [class.done]="o.status === 'CERRADA'" [class.cancel]="o.status === 'CANCELADA'">
-                  @for (s of flow; track s; let i = $index) { <span [class.on]="i <= step(o)"></span> }
-                </div>
-              </td>
-              <td><span [class]="badgeClass(o.status)">{{ statusLabel(o.status) }}</span></td>
-              @if (isStaff()) {
-                <td style="text-align:right">
-                  @if (nextStatus[o.status]) {
-                    <button class="btn btn--ghost btn--sm" (click)="advance(o, $event)" [disabled]="busyId() === o.id">
-                      {{ actionLabel(o) }} <app-icon name="chevron" [size]="14" />
+                  <span><app-icon name="userCheck" [size]="13" /> {{ o.tecnicoId }}</span>
+                }
+              </div>
+
+              @if (isStaff() && col.action) {
+                @if (assigningId() === o.id) {
+                  <div class="assign">
+                    <input class="input" placeholder="Nombre del técnico" autofocus
+                           [value]="tecnico()" (input)="tecnico.set($any($event.target).value)"
+                           (keyup.enter)="confirmAssign(o)" (keyup.escape)="assigningId.set(null)" />
+                    <div class="assign-actions">
+                      <button class="btn btn--primary btn--sm" (click)="confirmAssign(o)">Asignar</button>
+                      <button class="btn btn--ghost btn--sm" (click)="assigningId.set(null)">Volver</button>
+                    </div>
+                  </div>
+                } @else {
+                  <div class="ticket-actions">
+                    <button class="btn btn--primary btn--sm ticket-go" (click)="act(o, col)" [disabled]="busyId() === o.id">
+                      <app-icon [name]="col.action.icon" [size]="14" /> {{ col.action.label }}
                     </button>
-                  }
-                </td>
+                    @if (col.status !== 'EN_EJECUCION') {
+                      <button class="icon-btn" title="Cancelar orden" aria-label="Cancelar orden"
+                              (click)="cancel(o)" [disabled]="busyId() === o.id">
+                        <app-icon name="ban" [size]="15" />
+                      </button>
+                    }
+                  </div>
+                }
               }
-            </tr>
+            </article>
           } @empty {
-            <tr>
-              <td [attr.colspan]="isStaff() ? 6 : 4">
-                <div class="empty">
-                  <span class="empty-icon"><app-icon name="search" [size]="24" /></span>
-                  <h4>No hay órdenes para mostrar</h4>
-                  <p>Prueba con otro filtro o crea una nueva orden de trabajo.</p>
-                </div>
-              </td>
-            </tr>
+            <div class="lane-empty">Sin órdenes</div>
           }
         }
-      </tbody>
-    </table>
-  </div>
-  @if (!loading()) {
-    <div class="card-foot faint" style="font-size:12px">Mostrando {{ visible().length }} de {{ orders().length }} órdenes</div>
+      </div>
+    </div>
   }
 </section>
 
-@if (drawerOpen()) {
-  <div class="backdrop" (click)="closeDrawer()"></div>
-  <aside class="drawer" role="dialog" aria-label="Nueva orden de trabajo">
-    <div class="drawer-head">
-      <div>
-        <div class="eyebrow" style="margin:0"><app-icon name="plus" [size]="14" /> Nueva orden</div>
-        <h3 style="font-size:18px">Solicitud de mantención</h3>
-      </div>
-      <button class="icon-btn" (click)="closeDrawer()" aria-label="Cerrar"><app-icon name="x" /></button>
-    </div>
-    <form class="drawer-body form-grid" [formGroup]="form" (ngSubmit)="create()" id="newOrder">
-      <div class="field">
-        <label for="desc">Descripción del trabajo</label>
-        <textarea id="desc" class="textarea" formControlName="descripcion"
-                  placeholder="Ej: Corte de energía en el sector norte, poste 14"></textarea>
-        <span class="hint">{{ form.controls.descripcion.value.length }}/500 caracteres</span>
-      </div>
-      @if (isStaff()) {
-        <div class="field">
-          <label for="cli">Cliente</label>
-          <input id="cli" class="input" formControlName="clienteId" placeholder="Correo o ID del cliente" />
-          <span class="hint">Como Supervisor/Admin puedes crear órdenes a nombre de cualquier cliente.</span>
-        </div>
-      } @else {
-        <div class="alert alert--info" style="margin:0">
-          <app-icon name="info" />
-          <div>La orden quedará registrada a tu nombre (<strong>{{ auth.getActiveAccount()?.username }}</strong>).</div>
-        </div>
-      }
-      <div class="alert alert--warn" style="margin:0">
-        <app-icon name="flag" />
-        <div>La orden inicia en estado <strong>Creada</strong>. Un supervisor debe asignar un técnico para avanzar.</div>
-      </div>
-    </form>
-    <div class="drawer-foot">
-      <button class="btn btn--ghost" type="button" (click)="closeDrawer()">Cancelar</button>
-      <button class="btn btn--primary" type="submit" form="newOrder" [disabled]="form.invalid || saving()">
-        <app-icon name="check" [size]="16" /> {{ saving() ? 'Creando…' : 'Crear orden' }}
-      </button>
-    </div>
-  </aside>
+@if (cancelled().length) {
+  <div style="margin-top:18px">
+    <button class="btn btn--ghost btn--sm" (click)="showCancelled.set(!showCancelled())">
+      <app-icon name="ban" [size]="14" />
+      {{ showCancelled() ? 'Ocultar' : 'Ver' }} canceladas ({{ cancelled().length }})
+    </button>
+    @if (showCancelled()) {
+      <ul class="card list mt fade-in">
+        @for (o of cancelled(); track o.id) {
+          <li>
+            <a class="list-row" [routerLink]="['/workorders', o.id]">
+              <span class="code-pill">#{{ o.id }}</span>
+              <div class="main-col"><div class="t">{{ o.descripcion }}</div><div class="s">{{ o.clienteId }}</div></div>
+              <span class="badge badge--cancel">Cancelada</span>
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </div>
 }
