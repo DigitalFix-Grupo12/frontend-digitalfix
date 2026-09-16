@@ -3,22 +3,19 @@ import { CanActivateFn, Router } from '@angular/router';
 import { AuthService, DigitalFixRole } from '../services/auth.service';
 
 /**
- * Guard de autorización por rol. Se usa DESPUÉS de MsalGuard en la cadena
- * de canActivate (MsalGuard ya garantiza que el usuario está autenticado).
- *
- * Uso en las rutas:
- *   { path: 'reports', component: ReportsComponent,
- *     canActivate: [MsalGuard, roleGuard], data: { roles: ['Admin'] } }
+ * Autorizacion por rol en el frontend (UX). La autorizacion real la aplican
+ * el API Gateway y el BFF; este guard solo evita mostrar pantallas sin permiso.
+ * Si los roles aun no se leyeron del access token (recarga de pagina), los espera.
  */
-export const roleGuard: CanActivateFn = (route) => {
-  const authService = inject(AuthService);
+export const roleGuard: CanActivateFn = async (route) => {
+  const auth = inject(AuthService);
   const router = inject(Router);
 
-  const requiredRoles = (route.data?.['roles'] ?? []) as DigitalFixRole[];
-  if (requiredRoles.length === 0) return true;
+  const required = (route.data?.['roles'] ?? []) as DigitalFixRole[];
+  if (required.length === 0) return true;
 
-  if (authService.hasRole(...requiredRoles)) return true;
+  if (auth.getRoles().length === 0) await auth.refreshRoles();
+  if (auth.hasRole(...required)) return true;
 
-  router.navigate(['/dashboard'], { queryParams: { accessDenied: route.routeConfig?.path } });
-  return false;
+  return router.createUrlTree(['/dashboard'], { queryParams: { denied: route.routeConfig?.path } });
 };

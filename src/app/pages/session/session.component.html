@@ -1,100 +1,133 @@
-<header class="page-head">
-  <h2>Mi sesión</h2>
-  <p class="lede">Autenticación OIDC con Microsoft Entra ID y validación del JWT en el API Gateway.</p>
+<header class="page-head fade-in">
+  <div>
+    <div class="eyebrow"><app-icon name="shield" [size]="14" /> Seguridad</div>
+    <h1>Mi sesión y token</h1>
+    <p>Autenticación OIDC con Microsoft Entra ID y validación del JWT en el API Gateway y el BFF.</p>
+  </div>
+  <div class="actions">
+    <button class="btn btn--ghost" (click)="loadToken()"><app-icon name="refresh" [size]="16" /> Releer token</button>
+    <button class="btn btn--ghost" (click)="copyToken()" [disabled]="!accessToken()"><app-icon name="copy" [size]="16" /> Copiar access token</button>
+    <button class="btn btn--primary" (click)="runProbes()"><app-icon name="play" [size]="16" /> Probar rutas del Gateway</button>
+  </div>
 </header>
 
-<p *ngIf="error()" class="banner-error">{{ error() }}</p>
+@if (error()) {
+  <div class="alert alert--error"><app-icon name="alert" /><div>{{ error() }}</div></div>
+}
 
-<section class="detail-grid" style="max-width: 900px;">
-  <div class="detail-item">
-    <span class="detail-label">Flujo OAuth 2.0 / OIDC</span>
-    <span>Authorization Code + PKCE (S256)</span>
+<section class="grid grid-4 fade-in">
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Flujo OAuth 2.0 / OIDC</span><span class="kpi-icon kpi-icon--green"><app-icon name="shield" /></span></div>
+    <div style="font-weight:600;font-size:15px">Authorization Code + PKCE</div>
+    <div class="kpi-sub">code_challenge_method = S256</div>
   </div>
-  <div class="detail-item">
-    <span class="detail-label">Authority (IDaaS)</span>
-    <span class="mono" style="font-size: 12px; word-break: break-all;">{{ authority }}</span>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Roles (App Roles)</span><span class="kpi-icon kpi-icon--amber"><app-icon name="userCheck" /></span></div>
+    <div class="roles" style="display:flex;gap:6px;flex-wrap:wrap">
+      @for (r of authService.getRoles(); track r) { <span class="chip">{{ r }}</span> } @empty { <span class="chip chip--neutral">Sin rol asignado</span> }
+    </div>
+    <div class="kpi-sub">claim <span class="mono">roles</span> del access token</div>
   </div>
-  <div class="detail-item">
-    <span class="detail-label">Client ID (SPA)</span>
-    <span class="mono" style="font-size: 12px;">{{ config.azureAd.clientId }}</span>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Scope</span><span class="kpi-icon kpi-icon--blue"><app-icon name="key" /></span></div>
+    <div class="mono" style="font-size:14px;font-weight:600">{{ accessClaims()?.['scp'] ?? '—' }}</div>
+    <div class="kpi-sub">exigido por el JWT Authorizer</div>
   </div>
-  <div class="detail-item">
-    <span class="detail-label">Scope solicitado</span>
-    <span class="mono" style="font-size: 12px; word-break: break-all;">{{ config.api.scope }}</span>
-  </div>
-  <div class="detail-item">
-    <span class="detail-label">Roles</span>
-    <span>{{ authService.getRoles().join(', ') || 'Sin rol asignado' }}</span>
-  </div>
-  <div class="detail-item">
-    <span class="detail-label">Access token vence en</span>
-    <span class="mono">{{ formatExpiry(secondsLeft()) }}</span>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Access token vence en</span><span class="kpi-icon kpi-icon--violet"><app-icon name="clock" /></span></div>
+    <div class="kpi-value" style="font-size:24px">{{ formatExpiry(secondsLeft()) }}</div>
+    <div class="kpi-sub">MSAL lo renueva en silencio</div>
   </div>
 </section>
 
-<div class="field-row">
-  <button class="btn btn--primary" (click)="runProbes()">Probar rutas del API Gateway</button>
-  <button class="btn btn--subtle" (click)="copyToken()" [disabled]="!accessToken()">Copiar access token</button>
-  <button class="btn btn--subtle" (click)="loadToken()">Renovar lectura del token</button>
-</div>
+<section class="card mt-lg fade-in">
+  <div class="card-head"><h3><app-icon name="layers" /> Recorrido del token</h3><span class="chip chip--neutral">defensa en profundidad</span></div>
+  <div class="grid grid-3 card-pad">
+    @for (s of flowSteps; track s.title; let i = $index) {
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <span class="tl-icon tl-icon--amber"><app-icon [name]="s.icon" [size]="16" /></span>
+        <div>
+          <div style="font-weight:600"><span class="faint mono">{{ i + 1 }}.</span> {{ s.title }}</div>
+          <div class="faint" style="font-size:12.5px">{{ s.text }}</div>
+        </div>
+      </div>
+    }
+  </div>
+  <dl class="kv" style="margin:0;border-top:1px solid var(--line-soft)">
+    <div><dt>Authority (IDaaS)</dt><dd class="mono" style="font-size:12px">{{ authority }}</dd></div>
+    <div><dt>Client ID (SPA)</dt><dd class="mono" style="font-size:12px">{{ config.azureAd.clientId }}</dd></div>
+    <div><dt>Scope solicitado</dt><dd class="mono" style="font-size:12px">{{ config.api.scope }}</dd></div>
+    <div><dt>API Gateway</dt><dd class="mono" style="font-size:12px">{{ config.api.baseUrl }}</dd></div>
+  </dl>
+</section>
 
-<h3 style="font-size: 14px; margin: 8px 0 10px;">Rutas del API Gateway</h3>
-<div class="data-table" style="margin-bottom: 28px;">
-  <table>
-    <thead>
-      <tr>
-        <th>Ruta</th>
-        <th>Roles permitidos</th>
-        <th>Con token</th>
-        <th>Sin token</th>
-        <th>Respuesta</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let p of probes()">
-        <td class="mono">{{ p.method }} {{ p.path }}</td>
-        <td>{{ p.roles }}</td>
-        <td>
-          <span *ngIf="p.running && p.withToken === undefined" class="text-muted">…</span>
-          <span *ngIf="p.withToken !== undefined" [class]="statusClass(p.withToken)">{{ p.withToken }}</span>
-        </td>
-        <td>
-          <span *ngIf="p.withoutToken !== undefined" [class]="statusClass(p.withoutToken)">{{ p.withoutToken }}</span>
-        </td>
-        <td class="mono" style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ p.body }}</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+<section class="card mt-lg fade-in">
+  <div class="card-head">
+    <h3><app-icon name="gateway" /> Rutas del API Gateway</h3>
+    <span class="faint" style="font-size:12px">200 permitido · 401 sin token · 403 rol insuficiente</span>
+  </div>
+  <div class="table-wrap">
+    <table class="table">
+      <thead>
+        <tr><th>Ruta</th><th>Roles permitidos</th><th>Con token</th><th>Sin token</th><th>Respuesta</th></tr>
+      </thead>
+      <tbody>
+        @for (p of probes(); track p.path) {
+          <tr>
+            <td><span class="code-pill">{{ p.method }}</span> <span class="mono" style="font-size:12.5px">{{ p.path }}</span></td>
+            <td>{{ p.roles }}</td>
+            <td>
+              @if (p.withToken !== undefined) { <span [class]="statusClass(p.withToken)">{{ p.withToken }}</span> }
+              @else if (p.running) { <span class="faint">…</span> }
+              @else { <span class="faint">—</span> }
+            </td>
+            <td>
+              @if (p.withoutToken !== undefined) { <span [class]="statusClass(p.withoutToken)">{{ p.withoutToken }}</span> }
+              @else { <span class="faint">—</span> }
+            </td>
+            <td class="mono faint" style="font-size:12px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.body }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
 
-<h3 style="font-size: 14px; margin: 8px 0 4px;">Access token (para digitalfix-api)</h3>
-<p class="text-muted" style="margin: 0 0 10px;" *ngIf="tokenHeader() as h">
-  Header: alg <span class="mono">{{ h['alg'] }}</span> · kid <span class="mono">{{ h['kid'] }}</span>
-  — la firma se verifica con las claves públicas (JWKS) del tenant.
-</p>
-<div class="data-table" style="margin-bottom: 28px;">
-  <table>
-    <thead><tr><th>Claim</th><th>Valor</th><th>Uso</th></tr></thead>
-    <tbody>
-      <tr *ngFor="let r of accessRows()">
-        <td class="mono">{{ r.key }}</td>
-        <td class="mono" style="word-break: break-all;">{{ r.value }}</td>
-        <td class="text-muted">{{ r.note }}</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+<section class="grid grid-2 mt-lg fade-in">
+  <div class="card">
+    <div class="card-head">
+      <h3><app-icon name="key" /> Access token</h3>
+      @if (tokenHeader(); as h) { <span class="code-pill">{{ h['alg'] }} · kid {{ h['kid'] }}</span> }
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Claim</th><th>Valor</th></tr></thead>
+        <tbody>
+          @for (r of accessRows(); track r.key) {
+            <tr>
+              <td><span class="code-pill">{{ r.key }}</span></td>
+              <td><div class="mono" style="font-size:12px;word-break:break-all">{{ r.value }}</div><div class="sub">{{ r.note }}</div></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
 
-<h3 style="font-size: 14px; margin: 8px 0 10px;">ID token (OpenID Connect)</h3>
-<div class="data-table">
-  <table>
-    <thead><tr><th>Claim</th><th>Valor</th><th>Uso</th></tr></thead>
-    <tbody>
-      <tr *ngFor="let r of idRows()">
-        <td class="mono">{{ r.key }}</td>
-        <td class="mono" style="word-break: break-all;">{{ r.value }}</td>
-        <td class="text-muted">{{ r.note }}</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+  <div class="card">
+    <div class="card-head"><h3><app-icon name="user" /> ID token (OpenID Connect)</h3></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Claim</th><th>Valor</th></tr></thead>
+        <tbody>
+          @for (r of idRows(); track r.key) {
+            <tr>
+              <td><span class="code-pill">{{ r.key }}</span></td>
+              <td><div class="mono" style="font-size:12px;word-break:break-all">{{ r.value }}</div><div class="sub">{{ r.note }}</div></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

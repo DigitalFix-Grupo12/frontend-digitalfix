@@ -1,39 +1,95 @@
-<header class="page-head">
-  <h2>Catálogo técnico</h2>
-  <p class="lede">Servicios y repuestos disponibles para las órdenes de trabajo.</p>
+<header class="page-head fade-in">
+  <div>
+    <div class="eyebrow"><app-icon name="package" [size]="14" /> Operación</div>
+    <h1>Catálogo técnico</h1>
+    <p>Servicios ofrecidos y repuestos disponibles para las cuadrillas.</p>
+  </div>
+  <button class="btn btn--ghost" (click)="load()"><app-icon name="refresh" [size]="16" /> Actualizar</button>
 </header>
 
-<p *ngIf="error()" class="banner-error">{{ error() }}</p>
+@if (error()) {
+  <div class="alert alert--error"><app-icon name="alert" /><div>{{ error() }}</div></div>
+}
 
-<div class="field-row">
-  <input
-    class="search-input"
-    [ngModel]="search()"
-    (ngModelChange)="search.set($event)"
-    placeholder="Buscar servicio..."
-  />
-</div>
+<section class="grid grid-4 fade-in">
+  @if (items() === null) {
+    @for (i of [1, 2, 3, 4]; track i) { <div class="skeleton sk-kpi"></div> }
+  } @else {
+    <div class="card kpi">
+      <div class="kpi-top"><span class="kpi-label">Servicios</span><span class="kpi-icon kpi-icon--blue"><app-icon name="wrench" /></span></div>
+      <div class="kpi-value">{{ services() }}</div>
+      <div class="kpi-sub">tipos de trabajo</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-top"><span class="kpi-label">Repuestos</span><span class="kpi-icon kpi-icon--violet"><app-icon name="package" /></span></div>
+      <div class="kpi-value">{{ parts() }}</div>
+      <div class="kpi-sub">referencias en bodega</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-top"><span class="kpi-label">Stock bajo</span><span class="kpi-icon kpi-icon--amber"><app-icon name="alert" /></span></div>
+      <div class="kpi-value">{{ lowCount() }}</div>
+      <div class="kpi-sub">menos de {{ lowStock }} unidades</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-top"><span class="kpi-label">Valor en repuestos</span><span class="kpi-icon kpi-icon--green"><app-icon name="tag" /></span></div>
+      <div class="kpi-value" style="font-size:22px">{{ clp(inventoryValue()) }}</div>
+      <div class="kpi-sub">stock × tarifa</div>
+    </div>
+  }
+</section>
 
-<div class="data-table">
-  <table>
-    <thead>
-      <tr>
-        <th class="sortable" (click)="toggleSort('id')">ID <span class="sort-arrow" *ngIf="sortKey()==='id'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
-        <th class="sortable" (click)="toggleSort('nombre')">Servicio <span class="sort-arrow" *ngIf="sortKey()==='nombre'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
-        <th class="sortable" (click)="toggleSort('stock')">Stock <span class="sort-arrow" *ngIf="sortKey()==='stock'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
-        <th class="sortable" (click)="toggleSort('tarifa')">Tarifa <span class="sort-arrow" *ngIf="sortKey()==='tarifa'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let i of filteredItems()">
-        <td class="num">#{{ i.id }}</td>
-        <td>{{ i.nombre }}</td>
-        <td class="mono">{{ i.stock }}</td>
-        <td class="mono">${{ i.tarifa }}</td>
-      </tr>
-      <tr *ngIf="!filteredItems().length">
-        <td colspan="4" class="text-muted">Sin resultados.</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+<section class="card mt-lg fade-in">
+  <div class="toolbar">
+    <div class="segmented">
+      <button [class.on]="tab() === 'ALL'" (click)="tab.set('ALL')">Todo <span class="count">{{ (items() ?? []).length }}</span></button>
+      <button [class.on]="tab() === 'SERVICIO'" (click)="tab.set('SERVICIO')">Servicios <span class="count">{{ services() }}</span></button>
+      <button [class.on]="tab() === 'REPUESTO'" (click)="tab.set('REPUESTO')">Repuestos <span class="count">{{ parts() }}</span></button>
+    </div>
+    <div style="flex:1"></div>
+    <select class="select" style="width:auto" [value]="sort()" (change)="sort.set($any($event.target).value)">
+      <option value="nombre">Nombre (A-Z)</option>
+      <option value="tarifa-asc">Tarifa: menor a mayor</option>
+      <option value="tarifa-desc">Tarifa: mayor a menor</option>
+      <option value="stock">Stock: menor primero</option>
+    </select>
+    <div class="input-wrap" style="min-width:230px">
+      <app-icon name="search" [size]="16" />
+      <input class="input" placeholder="Buscar ítem" [value]="search()" (input)="search.set($any($event.target).value)" />
+    </div>
+  </div>
+
+  <div class="grid grid-3 card-pad">
+    @for (i of visible(); track i.id) {
+      <article class="card item-card">
+        <div class="item-head">
+          <span class="item-icon" [class.item-icon--svc]="i.tipo === 'SERVICIO'" [class.item-icon--part]="i.tipo === 'REPUESTO'">
+            <app-icon [name]="i.tipo === 'SERVICIO' ? 'wrench' : 'package'" [size]="20" />
+          </span>
+          <div style="flex:1;min-width:0">
+            <div class="item-name">{{ i.nombre }}</div>
+            <span class="chip chip--neutral" style="margin-top:6px">{{ i.tipo === 'SERVICIO' ? 'Servicio' : 'Repuesto' }} · #{{ i.id }}</span>
+          </div>
+        </div>
+        <div class="item-foot">
+          <div>
+            <div class="faint" style="font-size:11.5px">{{ i.tipo === 'SERVICIO' ? 'Tarifa por servicio' : 'Precio unitario' }}</div>
+            <div class="item-price">{{ clp(i.tarifa) }}</div>
+          </div>
+          @if (i.stock < lowStock) { <span class="badge badge--progress">Stock bajo</span> }
+        </div>
+        <div class="stock" [class.low]="i.stock < lowStock">
+          <div class="bar-track"><div class="bar-seg" [style.width.%]="stockPct(i)"></div></div>
+          <span class="mono faint" style="font-size:12px">{{ i.stock }} u.</span>
+        </div>
+      </article>
+    } @empty {
+      @if (items() !== null) {
+        <div class="empty" style="grid-column:1/-1">
+          <span class="empty-icon"><app-icon name="search" [size]="24" /></span>
+          <h4>Sin resultados</h4>
+          <p>No hay ítems que coincidan con la búsqueda.</p>
+        </div>
+      }
+    }
+  </div>
+</section>

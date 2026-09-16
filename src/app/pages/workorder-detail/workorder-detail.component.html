@@ -1,48 +1,127 @@
-<header class="page-head">
-  <button class="panel-link" style="background:none;border:none;padding:0;cursor:pointer;" (click)="back()">← Volver a órdenes</button>
-</header>
+<a class="btn btn--ghost btn--sm" routerLink="/workorders" style="margin-bottom:18px">
+  <app-icon name="back" [size]="14" /> Volver a órdenes
+</a>
 
-<p *ngIf="loading()" class="text-muted">Cargando...</p>
-<p *ngIf="notFound()" class="banner-error">No se encontró esa orden de trabajo.</p>
+@if (loading()) {
+  <div class="skeleton" style="height:36px;width:40%;margin-bottom:16px"></div>
+  <div class="skeleton" style="height:140px;border-radius:16px"></div>
+}
 
-<ng-container *ngIf="order() as o">
-  <header class="page-head">
-    <h2>Orden #{{ o.id }}</h2>
-    <p class="lede">{{ o.descripcion }}</p>
+@if (error()) {
+  <div class="card">
+    <div class="empty">
+      <span class="empty-icon"><app-icon name="search" [size]="24" /></span>
+      <h4>No pudimos mostrar la orden</h4>
+      <p>{{ error() }}</p>
+      <a class="btn btn--ghost mt" routerLink="/workorders">Ir al listado</a>
+    </div>
+  </div>
+}
+
+@if (order(); as o) {
+  <header class="page-head fade-in">
+    <div>
+      <div class="eyebrow"><app-icon name="wrench" [size]="14" /> Orden #{{ o.id }}</div>
+      <h1>{{ o.descripcion }}</h1>
+      <p>Creada {{ timeAgo(o.createdAt) }} · última actualización {{ timeAgo(o.updatedAt) }}</p>
+    </div>
+    <span [class]="badgeClass(o.status)" style="font-size:13px;padding:6px 14px 6px 12px">{{ statusLabel(o.status) }}</span>
   </header>
 
-  <div class="detail-grid">
-    <div class="detail-item">
-      <span class="detail-label">Cliente</span>
-      <span class="mono">{{ o.clienteId }}</span>
+  <section class="card fade-in">
+    @if (o.status === 'CANCELADA') {
+      <div class="alert alert--warn" style="margin:18px 22px 0">
+        <app-icon name="ban" /><div>Esta orden fue <strong>cancelada</strong> y ya no puede avanzar.</div>
+      </div>
+    }
+    <div class="stepper" [class.cancelled]="o.status === 'CANCELADA'">
+      @for (s of flow; track s; let i = $index) {
+        <div class="step" [class.done]="stepState(i) === 'done'" [class.current]="stepState(i) === 'current'">
+          <span class="step-dot"><app-icon [name]="stepState(i) === 'done' ? 'check' : meta[s].icon" [size]="18" /></span>
+          <span class="step-label">{{ meta[s].label }}</span>
+        </div>
+      }
     </div>
-    <div class="detail-item">
-      <span class="detail-label">Técnico asignado</span>
-      <span class="mono">{{ o.tecnicoId || '— sin asignar —' }}</span>
+    <dl class="kv" style="margin:0;border-top:1px solid var(--line-soft)">
+      <div><dt><app-icon name="user" [size]="13" /> Cliente</dt><dd class="mono">{{ o.clienteId }}</dd></div>
+      <div><dt><app-icon name="userCheck" [size]="13" /> Técnico</dt><dd>{{ o.tecnicoId || 'Sin asignar' }}</dd></div>
+      <div><dt><app-icon name="clock" [size]="13" /> Creada</dt><dd>{{ fmt(o.createdAt) }}</dd></div>
+      <div><dt><app-icon name="refresh" [size]="13" /> Actualizada</dt><dd>{{ fmt(o.updatedAt) }}</dd></div>
+      <div><dt><app-icon name="check" [size]="13" /> Cerrada</dt><dd>{{ fmt(o.closedAt) }}</dd></div>
+    </dl>
+  </section>
+
+  <section class="grid grid-main mt-lg fade-in">
+    <div class="card">
+      <div class="card-head"><h3><app-icon name="activity" /> Gestión de la orden</h3></div>
+      <div class="card-pad">
+        @if (!isStaff()) {
+          <div class="alert alert--info" style="margin:0">
+            <app-icon name="info" />
+            <div>Un supervisor gestiona el avance de tu orden. Aquí verás cada cambio de estado en tiempo real.</div>
+          </div>
+        } @else {
+          @if (next(); as nx) {
+          <div class="form-grid">
+            @if (nx === 'ASIGNADA') {
+              <div class="field">
+                <label for="tec">Técnico a asignar</label>
+                <input id="tec" class="input" placeholder="Ej: tecnico-07 o Juan Pérez"
+                       [value]="tecnico()" (input)="tecnico.set($any($event.target).value)"
+                       (keyup.enter)="advance()" />
+                <span class="hint">Regla del negocio: no se puede ejecutar una orden sin técnico asignado.</span>
+              </div>
+            }
+            <div class="actions">
+              <button class="btn btn--primary" (click)="advance()" [disabled]="busy()">
+                <app-icon [name]="meta[nx].icon" [size]="16" />
+                {{ nx === 'ASIGNADA' ? 'Asignar técnico' : 'Pasar a ' + meta[nx].label.toLowerCase() }}
+              </button>
+              @if (cancellable()) {
+                @if (!confirmCancel()) {
+                  <button class="btn btn--danger" (click)="confirmCancel.set(true)" [disabled]="busy()">
+                    <app-icon name="ban" [size]="16" /> Cancelar orden
+                  </button>
+                } @else {
+                  <span class="faint" style="font-size:12.5px">¿Seguro?</span>
+                  <button class="btn btn--danger btn--sm" (click)="cancel()">Sí, cancelar</button>
+                  <button class="btn btn--ghost btn--sm" (click)="confirmCancel.set(false)">No</button>
+                }
+              }
+            </div>
+          </div>
+        } @else {
+          <div class="empty" style="padding:20px">
+            <span class="empty-icon"><app-icon [name]="o.status === 'CERRADA' ? 'check' : 'ban'" [size]="24" /></span>
+            <h4>Orden en estado final</h4>
+            <p>{{ o.status === 'CERRADA' ? 'El trabajo fue completado.' : 'La orden fue cancelada.' }}</p>
+          </div>
+          }
+        }
+      </div>
     </div>
-    <div class="detail-item">
-      <span class="detail-label">Estado actual</span>
-      <span class="mono">{{ o.status }}</span>
+
+    <div class="card">
+      <div class="card-head"><h3><app-icon name="history" /> Historial</h3></div>
+      @if (!canSeeHistory()) {
+        <div class="card-pad faint" style="font-size:13px">El historial detallado está disponible para Administración y Auditoría.</div>
+      } @else if (history() === null) {
+        @for (i of [1, 2]; track i) { <div class="skeleton sk-line"></div> }
+      } @else {
+        <ul class="timeline">
+          @for (h of history(); track h.id) {
+            <li class="tl-item">
+              <span class="tl-icon tl-icon--{{ historyTone(h.accion) }}"><app-icon [name]="historyIcon(h.accion)" [size]="16" /></span>
+              <div>
+                <div class="tl-title">{{ h.accion }}</div>
+                <div class="tl-meta"><span>{{ h.usuario }}</span><span>·</span><span [title]="fmt(h.fecha)">{{ timeAgo(h.fecha) }}</span></div>
+              </div>
+            </li>
+          } @empty {
+            <li class="faint" style="padding:14px 0;font-size:13px">Sin eventos registrados para esta orden.</li>
+          }
+        </ul>
+      }
     </div>
-  </div>
-
-  <div class="advance-panel" *ngIf="canAdvance() && nextStatus[o.status]">
-    <h3 style="font-size: 14px; margin-bottom: 10px;">Avanzar estado</h3>
-
-    <div class="field-row" *ngIf="needsTechnician()">
-      <input
-        [ngModel]="tecnicoId()"
-        (ngModelChange)="tecnicoId.set($event)"
-        placeholder="ID o nombre del técnico a asignar"
-      />
-    </div>
-
-    <button class="btn btn--primary" (click)="advance()">
-      Avanzar a {{ nextStatus[o.status] }}
-    </button>
-  </div>
-
-  <p class="text-muted" *ngIf="canAdvance() && !nextStatus[o.status]">
-    Esta orden ya está en un estado final.
-  </p>
-</ng-container>
+  </section>
+}

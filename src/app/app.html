@@ -1,50 +1,96 @@
-<ng-container *ngIf="authService.isLoggedIn(); else loginScreen">
+@if (authService.isLoggedIn()) {
   <div class="shell">
-    <aside class="sidebar">
+    <aside class="sidebar" [class.open]="menuOpen()">
       <div class="brand">
-        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-mark"><app-icon name="bolt" [size]="20" /></span>
         <div>
           <div class="brand-name">DigitalFix</div>
-          <div class="brand-sub">Mantención eléctrica</div>
+          <div class="brand-sub">Mantención eléctrica en terreno</div>
         </div>
       </div>
 
+      <div class="nav-label">Operación</div>
       <nav class="nav">
-        <a routerLink="/dashboard" routerLinkActive="active">
-          <span class="nav-dot" aria-hidden="true"></span>Dashboard
-        </a>
-        <a routerLink="/workorders" routerLinkActive="active" *ngIf="authService.hasRole('Admin','Supervisor','Cliente')">
-          <span class="nav-dot" aria-hidden="true"></span>Órdenes de trabajo
-        </a>
-        <a routerLink="/catalog" routerLinkActive="active" *ngIf="authService.hasRole('Admin','Supervisor')">
-          <span class="nav-dot" aria-hidden="true"></span>Catálogo
-        </a>
-        <a routerLink="/reports" routerLinkActive="active" *ngIf="authService.hasRole('Admin')">
-          <span class="nav-dot" aria-hidden="true"></span>Reportería
-        </a>
-        <a routerLink="/audit" routerLinkActive="active" *ngIf="authService.hasRole('Admin','Auditor')">
-          <span class="nav-dot" aria-hidden="true"></span>Auditoría
-        </a>
-        <a routerLink="/session" routerLinkActive="active">
-          <span class="nav-dot" aria-hidden="true"></span>Mi sesión
-        </a>
+        @for (item of operations; track item.path) {
+          @if (canSee(item)) {
+            <a [routerLink]="item.path" routerLinkActive="active">
+              <app-icon [name]="item.icon" />{{ item.label }}
+            </a>
+          }
+        }
       </nav>
 
-      <div class="account">
-        <div class="account-name">{{ authService.getDisplayName() }}</div>
-        <div class="account-role">{{ authService.getRoles().join(', ') || 'Sin rol asignado' }}</div>
-        <button class="btn-ghost" (click)="logout()">Cerrar sesión</button>
+      @if (visibleAnalytics().length) {
+        <div class="nav-label">Análisis</div>
+        <nav class="nav">
+          @for (item of visibleAnalytics(); track item.path) {
+            <a [routerLink]="item.path" routerLinkActive="active">
+              <app-icon [name]="item.icon" />{{ item.label }}
+            </a>
+          }
+        </nav>
+      }
+
+      <div class="nav-label">Seguridad</div>
+      <nav class="nav">
+        @for (item of security; track item.path) {
+          <a [routerLink]="item.path" routerLinkActive="active">
+            <app-icon [name]="item.icon" />{{ item.label }}
+          </a>
+        }
+      </nav>
+
+      <div class="nav-spacer"></div>
+
+      <div class="user-card">
+        <span class="avatar">{{ userInitials() }}</span>
+        <div class="who">
+          <div class="name" [title]="authService.getDisplayName()">{{ authService.getDisplayName() }}</div>
+          <div class="roles">
+            @for (r of authService.getRoles(); track r) {
+              <span class="chip">{{ r }}</span>
+            } @empty {
+              <span class="chip chip--neutral">Sin rol</span>
+            }
+          </div>
+        </div>
+        <button class="icon-btn" (click)="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">
+          <app-icon name="logout" />
+        </button>
       </div>
     </aside>
 
-    <main class="content">
-      <router-outlet></router-outlet>
-    </main>
+    @if (menuOpen()) {
+      <div class="backdrop" (click)="menuOpen.set(false)"></div>
+    }
+
+    <div class="main">
+      <header class="topbar">
+        <button class="icon-btn menu-btn" (click)="menuOpen.set(true)" aria-label="Abrir menú">
+          <app-icon name="menu" />
+        </button>
+        <div class="crumbs">
+          <span>DigitalFix</span>
+          <app-icon name="chevron" [size]="14" />
+          <strong>{{ pageTitle() }}</strong>
+        </div>
+        <div class="grow"></div>
+        <span class="env-chip" [title]="'API Gateway: ' + (api.backendOnline() ? 'operativo' : 'sin respuesta')">
+          <span class="dot"
+                [class.dot--on]="api.backendOnline() === true"
+                [class.dot--off]="api.backendOnline() === false"></span>
+          <span class="env-text">AWS · us-east-1 ·
+            {{ api.backendOnline() === null ? 'verificando' : api.backendOnline() ? 'en línea' : 'sin conexión' }}</span>
+        </span>
+      </header>
+
+      <main class="content">
+        <router-outlet />
+      </main>
+    </div>
   </div>
-</ng-container>
+} @else {
+  <router-outlet />
+}
 
-<ng-template #loginScreen>
-  <router-outlet></router-outlet>
-</ng-template>
-
-<app-toast-tray></app-toast-tray>
+<app-toast-tray />

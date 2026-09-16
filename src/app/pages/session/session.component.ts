@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { IconComponent } from '../../core/ui/icon.component';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { appConfig } from '../../core/config/app-config';
@@ -25,7 +26,7 @@ interface RouteProbe {
 @Component({
   selector: 'app-session',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, IconComponent],
   templateUrl: './session.component.html',
 })
 export class SessionComponent implements OnInit, OnDestroy {
@@ -46,7 +47,7 @@ export class SessionComponent implements OnInit, OnDestroy {
 
   probes = signal<RouteProbe[]>([
     { method: 'GET', path: '/api/workorders', roles: 'Admin, Supervisor, Cliente' },
-    { method: 'GET', path: '/api/workorders/1', roles: 'Admin, Supervisor, Cliente' },
+    { method: 'GET', path: '/api/workorders/1', roles: 'Admin, Supervisor, Cliente (solo si es suya; si no, 404)' },
     { method: 'GET', path: '/api/catalog/services', roles: 'Admin, Supervisor' },
     { method: 'GET', path: '/api/report/kpis?range=last24h', roles: 'Admin' },
     { method: 'GET', path: '/api/audit', roles: 'Admin, Auditor' },
@@ -147,10 +148,19 @@ export class SessionComponent implements OnInit, OnDestroy {
 
   statusClass(code?: number): string {
     if (code === undefined) return '';
-    if (code >= 200 && code < 300) return 'pill pill--done';
-    if (code === 401 || code === 403) return 'pill pill--progress';
-    return 'pill pill--cancel';
+    if (code >= 200 && code < 300) return 'badge badge--done';
+    if (code === 401 || code === 403) return 'badge badge--progress';
+    return 'badge badge--danger';
   }
+
+  readonly flowSteps = [
+    { icon: 'key', title: 'PKCE', text: 'MSAL genera code_verifier y su hash code_challenge (S256), además de state y nonce.' },
+    { icon: 'lock', title: '/authorize', text: 'Redirección a Entra ID. El usuario se autentica (contraseña + MFA).' },
+    { icon: 'check', title: 'Código', text: 'Entra devuelve un authorization code; MSAL valida el state.' },
+    { icon: 'refresh', title: '/token', text: 'Se canjea el code enviando el code_verifier. Sin secreto de cliente.' },
+    { icon: 'gateway', title: 'API Gateway', text: 'JWT Authorizer valida firma, exp, issuer, audience y scope.' },
+    { icon: 'server', title: 'BFF', text: 'Spring Security revalida el token y autoriza por App Role.' },
+  ];
 
   formatExpiry(sec: number): string {
     const m = Math.floor(sec / 60);

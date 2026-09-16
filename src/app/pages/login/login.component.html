@@ -1,13 +1,65 @@
-<section class="login-wrap">
-  <div class="login-card">
-    <span class="brand-mark" aria-hidden="true"></span>
-    <h1>DigitalFix</h1>
-    <p class="tagline">Plataforma de órdenes de trabajo para mantención eléctrica en terreno.</p>
+<div class="auth">
+  <section class="auth-hero">
+    <div class="brand">
+      <span class="brand-mark"><app-icon name="bolt" [size]="20" /></span>
+      <div>
+        <div class="brand-name">DigitalFix</div>
+        <div class="brand-sub">Mantención eléctrica en terreno</div>
+      </div>
+    </div>
 
-    <button class="btn-primary" (click)="authService.login()">
-      Iniciar sesión con Microsoft
-    </button>
+    <div class="fade-in">
+      <div class="eyebrow"><app-icon name="cloud" [size]="14" /> Plataforma cloud native</div>
+      <h1>Cada falla eléctrica, <em>resuelta y trazada</em> de punta a punta.</h1>
+      <p class="lead">
+        Coordina a supervisores, técnicos y clientes en una sola plataforma segura,
+        desplegada en AWS y protegida con Microsoft Entra ID.
+      </p>
 
-    <p class="fine-print">Acceso restringido a cuentas autorizadas del tenant DigitalFix.</p>
-  </div>
-</section>
+      <div class="features">
+        @for (f of features; track f.title) {
+          <div class="feature">
+            <span class="kpi-icon kpi-icon--{{ f.tone }}"><app-icon [name]="f.icon" /></span>
+            <div>
+              <strong>{{ f.title }}</strong>
+              <span>{{ f.text }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="auth-foot">
+      <span>Angular + MSAL</span>
+      <span>AWS API Gateway</span>
+      <span>Spring Boot · Amazon RDS</span>
+    </div>
+  </section>
+
+  <section class="auth-panel">
+    <div class="card auth-card fade-in">
+      <h2>Bienvenido</h2>
+      <p>Inicia sesión con tu cuenta corporativa para continuar.</p>
+
+      <button class="btn btn--primary btn--lg btn--block" (click)="authService.login()">
+        <span class="ms-logo" aria-hidden="true">
+          <i style="background:#f25022"></i><i style="background:#7fba00"></i>
+          <i style="background:#00a4ef"></i><i style="background:#ffb900"></i>
+        </span>
+        Iniciar sesión con Microsoft
+      </button>
+
+      <p class="faint" style="font-size:12.5px;margin:14px 0 0;">
+        ¿No tienes cuenta? Presiona el botón, escribe tu correo y Microsoft te guiará para
+        <strong class="muted">crear tu cuenta</strong> con un código de verificación.
+      </p>
+
+      <div class="divider">Conexión segura</div>
+      <ul class="trust">
+        <li><app-icon name="check" [size]="16" /> OAuth 2.0 / OpenID Connect con Authorization Code + PKCE</li>
+        <li><app-icon name="check" [size]="16" /> Token JWT validado en el API Gateway y en el backend</li>
+        <li><app-icon name="check" [size]="16" /> Permisos por rol definidos en Microsoft Entra ID</li>
+      </ul>
+    </div>
+  </section>
+</div>

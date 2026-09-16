@@ -1,56 +1,70 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
-import { appConfig } from '../../core/config/app-config';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ApiService, CatalogItem } from '../../core/services/api.service';
+import { IconComponent } from '../../core/ui/icon.component';
+import { clp, httpErrorMessage } from '../../core/ui/format';
 
-interface CatalogItem { id: number; nombre: string; stock: number; tarifa: number; }
-type SortKey = 'id' | 'nombre' | 'stock' | 'tarifa';
+type Tab = 'ALL' | 'SERVICIO' | 'REPUESTO';
+type Sort = 'nombre' | 'tarifa-asc' | 'tarifa-desc' | 'stock';
+
+const LOW_STOCK = 10;
 
 @Component({
   selector: 'app-catalog',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [IconComponent],
   templateUrl: './catalog.component.html',
 })
 export class CatalogComponent implements OnInit {
-  private http = inject(HttpClient);
-  items = signal<CatalogItem[]>([]);
+  private api = inject(ApiService);
+  readonly clp = clp;
+  readonly lowStock = LOW_STOCK;
+
+  items = signal<CatalogItem[] | null>(null);
   error = signal<string | null>(null);
+  tab = signal<Tab>('ALL');
   search = signal('');
-  sortKey = signal<SortKey>('id');
-  sortDir = signal<1 | -1>(1);
+  sort = signal<Sort>('nombre');
 
-  filteredItems = computed(() => {
-    const term = this.search().trim().toLowerCase();
-    const key = this.sortKey();
-    const dir = this.sortDir();
+  maxStock = computed(() => Math.max(1, ...(this.items() ?? []).map((i) => i.stock)));
+  services = computed(() => (this.items() ?? []).filter((i) => i.tipo === 'SERVICIO').length);
+  parts = computed(() => (this.items() ?? []).filter((i) => i.tipo === 'REPUESTO').length);
+  lowCount = computed(() => (this.items() ?? []).filter((i) => i.stock < LOW_STOCK).length);
+  inventoryValue = computed(() =>
+    (this.items() ?? []).filter((i) => i.tipo === 'REPUESTO').reduce((acc, i) => acc + i.stock * i.tarifa, 0)
+  );
 
-    let list = this.items();
-    if (term) list = list.filter((i) => i.nombre.toLowerCase().includes(term));
-
-    return [...list].sort((a, b) => {
-      const av = a[key];
-      const bv = b[key];
-      if (av < bv) return -1 * dir;
-      if (av > bv) return 1 * dir;
-      return 0;
-    });
+  visible = computed(() => {
+    const t = this.tab();
+    const q = this.search().trim().toLowerCase();
+    let list = this.items() ?? [];
+    if (t !== 'ALL') list = list.filter((i) => i.tipo === t);
+    if (q) list = list.filter((i) => i.nombre.toLowerCase().includes(q));
+    const s = this.sort();
+    return [...list].sort((a, b) =>
+      s === 'tarifa-asc' ? a.tarifa - b.tarifa
+        : s === 'tarifa-desc' ? b.tarifa - a.tarifa
+        : s === 'stock' ? a.stock - b.stock
+        : a.nombre.localeCompare(b.nombre, 'es')
+    );
   });
 
   ngOnInit(): void {
-    this.http.get<CatalogItem[]>(`${appConfig.api.baseUrl}/api/catalog/services`).subscribe({
-      next: (data) => this.items.set(data),
-      error: (err) => this.error.set(`HTTP ${err.status}`),
+    this.load();
+  }
+
+  load(): void {
+    this.items.set(null);
+    this.error.set(null);
+    this.api.catalog().subscribe({
+      next: (d) => this.items.set(d),
+      error: (err) => {
+        this.error.set(httpErrorMessage(err));
+        this.items.set([]);
+      },
     });
   }
 
-  toggleSort(key: SortKey): void {
-    if (this.sortKey() === key) {
-      this.sortDir.update((d) => (d === 1 ? -1 : 1));
-    } else {
-      this.sortKey.set(key);
-      this.sortDir.set(1);
-    }
+  stockPct(i: CatalogItem): number {
+    return Math.max(4, (i.stock / this.maxStock()) * 100);
   }
 }

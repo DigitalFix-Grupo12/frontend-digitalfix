@@ -12,18 +12,25 @@ export type WorkOrderStatus =
   | 'CANCELADA';
 
 export interface WorkOrder {
-  id?: number;
+  id: number;
   descripcion: string;
   clienteId: string;
-  tecnicoId?: string;
+  tecnicoId?: string | null;
   status: WorkOrderStatus;
   createdAt?: string;
+  updatedAt?: string;
+  closedAt?: string | null;
+}
+
+export interface NewWorkOrder {
+  descripcion: string;
+  /** Obligatorio para Admin/Supervisor; para el rol Cliente lo fija el backend. */
+  clienteId?: string;
 }
 
 /**
- * Todas las llamadas van al BFF (o al API Gateway una vez desplegado).
- * El MsalInterceptor (configurado en msal.factories.ts) adjunta el Bearer
- * token automáticamente porque la URL coincide con protectedResourceMap.
+ * Todas las llamadas van al API Gateway. El MsalInterceptor adjunta el Bearer
+ * token automaticamente porque la URL coincide con protectedResourceMap.
  */
 @Injectable({ providedIn: 'root' })
 export class WorkordersService {
@@ -40,7 +47,7 @@ export class WorkordersService {
     return this.http.get<WorkOrder>(`${this.baseUrl}/${id}`);
   }
 
-  create(order: WorkOrder): Observable<WorkOrder> {
+  create(order: NewWorkOrder): Observable<WorkOrder> {
     return this.http.post<WorkOrder>(this.baseUrl, order);
   }
 

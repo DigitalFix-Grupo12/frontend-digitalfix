@@ -1,170 +1,195 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
-import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
-import { WorkordersService, WorkOrder, WorkOrderStatus } from '../../core/services/workorders.service';
+import { WorkOrder, WorkOrderStatus, WorkordersService } from '../../core/services/workorders.service';
+import { IconComponent } from '../../core/ui/icon.component';
+import { FLOW, NEXT_STATUS, STATUS_META, badgeClass, httpErrorMessage, statusLabel, timeAgo } from '../../core/ui/format';
 
-type SortKey = 'id' | 'descripcion' | 'clienteId' | 'status';
+type SortKey = 'id' | 'descripcion' | 'clienteId' | 'status' | 'createdAt';
+type Filter = WorkOrderStatus | 'ALL' | 'ACTIVE';
 
 @Component({
   selector: 'app-workorders',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [ReactiveFormsModule, IconComponent],
   templateUrl: './workorders.component.html',
 })
 export class WorkordersComponent implements OnInit {
-  private workordersService = inject(WorkordersService);
+  private service = inject(WorkordersService);
   private fb = inject(FormBuilder);
   private toast = inject(ToastService);
   private router = inject(Router);
-  authService = inject(AuthService);
+  private route = inject(ActivatedRoute);
+  auth = inject(AuthService);
+
+  readonly badgeClass = badgeClass;
+  readonly statusLabel = statusLabel;
+  readonly timeAgo = timeAgo;
+  readonly nextStatus = NEXT_STATUS;
+  readonly flow = FLOW;
 
   orders = signal<WorkOrder[]>([]);
-  loading = signal(false);
+  loading = signal(true);
   error = signal<string | null>(null);
-  statusFilter = signal<WorkOrderStatus | 'ALL'>('ALL');
+  filter = signal<Filter>('ACTIVE');
   search = signal('');
   sortKey = signal<SortKey>('id');
   sortDir = signal<1 | -1>(-1);
+  drawerOpen = signal(false);
+  saving = signal(false);
+  busyId = signal<number | null>(null);
 
-  filteredOrders = computed(() => {
-    const filter = this.statusFilter();
+  isStaff = computed(() => this.auth.hasRole('Admin', 'Supervisor'));
+
+  readonly filters: { key: Filter; label: string }[] = [
+    { key: 'ACTIVE', label: 'Activas' },
+    { key: 'CREADA', label: 'Por asignar' },
+    { key: 'ASIGNADA', label: 'Asignadas' },
+    { key: 'EN_DESPLAZAMIENTO', label: 'En ruta' },
+    { key: 'EN_EJECUCION', label: 'En ejecución' },
+    { key: 'CERRADA', label: 'Cerradas' },
+    { key: 'CANCELADA', label: 'Canceladas' },
+    { key: 'ALL', label: 'Todas' },
+  ];
+
+  counts = computed(() => {
+    const list = this.orders();
+    const c: Record<string, number> = { ALL: list.length, ACTIVE: 0 };
+    for (const o of list) {
+      c[o.status] = (c[o.status] ?? 0) + 1;
+      if (o.status !== 'CERRADA' && o.status !== 'CANCELADA') c['ACTIVE']++;
+    }
+    return c;
+  });
+
+  visible = computed(() => {
+    const f = this.filter();
     const term = this.search().trim().toLowerCase();
     const key = this.sortKey();
     const dir = this.sortDir();
 
     let list = this.orders();
-    if (filter !== 'ALL') list = list.filter((o) => o.status === filter);
+    if (f === 'ACTIVE') list = list.filter((o) => o.status !== 'CERRADA' && o.status !== 'CANCELADA');
+    else if (f !== 'ALL') list = list.filter((o) => o.status === f);
     if (term) {
-      list = list.filter(
-        (o) =>
-          o.descripcion.toLowerCase().includes(term) ||
-          o.clienteId.toLowerCase().includes(term) ||
-          String(o.id).includes(term)
+      list = list.filter((o) =>
+        [o.descripcion, o.clienteId, o.tecnicoId ?? '', `#${o.id}`, statusLabel(o.status)]
+          .some((v) => v.toLowerCase().includes(term))
       );
     }
-
     return [...list].sort((a, b) => {
-      const av = a[key] ?? '';
-      const bv = b[key] ?? '';
-      if (av < bv) return -1 * dir;
-      if (av > bv) return 1 * dir;
-      return 0;
+      const av = (a[key] ?? '') as string | number;
+      const bv = (b[key] ?? '') as string | number;
+      return av < bv ? -dir : av > bv ? dir : 0;
     });
   });
 
-  readonly statuses: WorkOrderStatus[] = [
-    'CREADA',
-    'ASIGNADA',
-    'EN_DESPLAZAMIENTO',
-    'EN_EJECUCION',
-    'CERRADA',
-    'CANCELADA',
-  ];
-
-  readonly nextStatus: Record<WorkOrderStatus, WorkOrderStatus | null> = {
-    CREADA: 'ASIGNADA',
-    ASIGNADA: 'EN_DESPLAZAMIENTO',
-    EN_DESPLAZAMIENTO: 'EN_EJECUCION',
-    EN_EJECUCION: 'CERRADA',
-    CERRADA: null,
-    CANCELADA: null,
-  };
-
   form = this.fb.nonNullable.group({
-    descripcion: ['', Validators.required],
-    clienteId: ['', Validators.required],
+    descripcion: ['', [Validators.required, Validators.maxLength(500)]],
+    clienteId: [''],
   });
 
-  ngOnInit(): void {
+  async ngOnInit(): Promise<void> {
+    if (this.auth.getRoles().length === 0) await this.auth.refreshRoles();
+    if (this.isStaff()) this.form.controls.clienteId.addValidators(Validators.required);
+    if (this.route.snapshot.queryParamMap.get('nueva')) this.openDrawer();
     this.reload();
   }
 
   reload(): void {
     this.loading.set(true);
     this.error.set(null);
-    this.workordersService.list().subscribe({
-      next: (orders) => {
-        this.orders.set(orders);
+    this.service.list().subscribe({
+      next: (o) => {
+        this.orders.set(o);
         this.loading.set(false);
       },
       error: (err) => {
-        this.error.set(`No se pudo cargar (HTTP ${err.status}): ${err.error?.message ?? err.message}`);
+        this.error.set(httpErrorMessage(err));
         this.loading.set(false);
       },
     });
   }
 
+  openDrawer(): void {
+    this.form.reset();
+    this.drawerOpen.set(true);
+  }
+
+  closeDrawer(): void {
+    this.drawerOpen.set(false);
+    if (this.route.snapshot.queryParamMap.get('nueva')) {
+      void this.router.navigate([], { queryParams: {}, replaceUrl: true });
+    }
+  }
+
   create(): void {
-    if (this.form.invalid) return;
+    if (this.form.invalid || this.saving()) return;
+    this.saving.set(true);
     const { descripcion, clienteId } = this.form.getRawValue();
-    this.workordersService
-      .create({ descripcion, clienteId, status: 'CREADA' })
+    this.service
+      .create({ descripcion: descripcion.trim(), clienteId: this.isStaff() ? clienteId.trim() : undefined })
       .subscribe({
-        next: () => {
-          this.form.reset();
-          this.reload();
-          this.toast.success('Orden creada correctamente.');
+        next: (o) => {
+          this.saving.set(false);
+          this.closeDrawer();
+          this.filter.set('ACTIVE');
+          this.orders.update((list) => [o, ...list]);
+          this.toast.success(`Orden #${o.id} creada.`);
         },
-        error: (err) => this.toast.error(`No se pudo crear (HTTP ${err.status}).`),
+        error: (err) => {
+          this.saving.set(false);
+          this.toast.error(httpErrorMessage(err));
+        },
       });
   }
 
   advance(order: WorkOrder, event: Event): void {
     event.stopPropagation();
-    const next = this.nextStatus[order.status];
-    if (!next || !order.id) return;
-
+    const next = NEXT_STATUS[order.status];
+    if (!next) return;
     if (next === 'ASIGNADA') {
-      // Requiere indicar técnico: se hace desde el detalle.
-      this.router.navigate(['/workorders', order.id]);
+      void this.router.navigate(['/workorders', order.id]);
       return;
     }
-
-    this.workordersService.updateStatus(order.id, next).subscribe({
-      next: () => {
-        this.reload();
-        this.toast.success(`Orden #${order.id} ahora está ${next}.`);
+    this.busyId.set(order.id);
+    this.service.updateStatus(order.id, next).subscribe({
+      next: (updated) => {
+        this.busyId.set(null);
+        this.orders.update((list) => list.map((o) => (o.id === updated.id ? updated : o)));
+        this.toast.success(`Orden #${order.id}: ${statusLabel(next)}.`);
       },
-      error: (err) => this.toast.error(`No se pudo cambiar el estado (HTTP ${err.status}).`),
+      error: (err) => {
+        this.busyId.set(null);
+        this.toast.error(httpErrorMessage(err));
+      },
     });
   }
 
-  openDetail(order: WorkOrder): void {
-    if (order.id) this.router.navigate(['/workorders', order.id]);
+  open(order: WorkOrder): void {
+    void this.router.navigate(['/workorders', order.id]);
   }
 
-  toggleSort(key: SortKey): void {
-    if (this.sortKey() === key) {
-      this.sortDir.update((d) => (d === 1 ? -1 : 1));
-    } else {
+  sort(key: SortKey): void {
+    if (this.sortKey() === key) this.sortDir.update((d) => (d === 1 ? -1 : 1));
+    else {
       this.sortKey.set(key);
       this.sortDir.set(1);
     }
   }
 
-  canCreate(): boolean {
-    return this.authService.hasRole('Cliente', 'Supervisor', 'Admin');
+  arrow(key: SortKey): string {
+    return this.sortKey() === key ? (this.sortDir() === 1 ? '↑' : '↓') : '';
   }
 
-  canAdvance(): boolean {
-    return this.authService.hasRole('Supervisor', 'Admin');
+  step(o: WorkOrder): number {
+    return STATUS_META[o.status].step;
   }
 
-  pillClass(status: WorkOrderStatus): string {
-    switch (status) {
-      case 'CREADA':
-        return 'pill pill--open';
-      case 'ASIGNADA':
-      case 'EN_DESPLAZAMIENTO':
-      case 'EN_EJECUCION':
-        return 'pill pill--progress';
-      case 'CERRADA':
-        return 'pill pill--done';
-      case 'CANCELADA':
-        return 'pill pill--cancel';
-    }
+  actionLabel(o: WorkOrder): string {
+    const next = NEXT_STATUS[o.status];
+    return next === 'ASIGNADA' ? 'Asignar' : next ? statusLabel(next) : '';
   }
 }

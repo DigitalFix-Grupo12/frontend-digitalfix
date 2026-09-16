@@ -1,39 +1,87 @@
-<header class="page-head">
-  <h2>Auditoría</h2>
-  <p class="lede">Timeline de eventos — solo lectura.</p>
+<header class="page-head fade-in">
+  <div>
+    <div class="eyebrow"><app-icon name="history" [size]="14" /> Análisis</div>
+    <h1>Auditoría</h1>
+    <p>Timeline inmutable de cada acción realizada sobre las órdenes (solo lectura).</p>
+  </div>
+  <div class="actions">
+    <button class="btn btn--ghost" (click)="load()"><app-icon name="refresh" [size]="16" /> Actualizar</button>
+    <button class="btn btn--primary" (click)="exportCsv()" [disabled]="!filtered().length">
+      <app-icon name="copy" [size]="16" /> Exportar CSV
+    </button>
+  </div>
 </header>
 
-<p *ngIf="error()" class="banner-error">{{ error() }}</p>
+@if (error()) {
+  <div class="alert alert--error"><app-icon name="alert" /><div>{{ error() }}</div></div>
+}
 
-<div class="field-row">
-  <input
-    class="search-input"
-    [ngModel]="search()"
-    (ngModelChange)="search.set($event)"
-    placeholder="Buscar por usuario o acción..."
-  />
-</div>
+<section class="grid grid-3 fade-in">
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Eventos registrados</span><span class="kpi-icon kpi-icon--blue"><app-icon name="history" /></span></div>
+    <div class="kpi-value">{{ (events() ?? []).length }}</div>
+    <div class="kpi-sub">{{ filtered().length }} con los filtros actuales</div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Usuarios con actividad</span><span class="kpi-icon kpi-icon--violet"><app-icon name="users" /></span></div>
+    <div class="kpi-value">{{ users().length }}</div>
+    <div class="kpi-sub">identidades desde el token JWT</div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Último evento</span><span class="kpi-icon kpi-icon--green"><app-icon name="clock" /></span></div>
+    <div class="kpi-value" style="font-size:20px">{{ lastEvent() ? timeAgo(lastEvent()!.fecha) : '—' }}</div>
+    <div class="kpi-sub">{{ lastEvent()?.accion ?? 'sin actividad' }}</div>
+  </div>
+</section>
 
-<div class="data-table">
-  <table>
-    <thead>
-      <tr>
-        <th class="sortable" (click)="toggleSort('id')">ID <span class="sort-arrow" *ngIf="sortKey()==='id'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
-        <th class="sortable" (click)="toggleSort('usuario')">Usuario <span class="sort-arrow" *ngIf="sortKey()==='usuario'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
-        <th class="sortable" (click)="toggleSort('accion')">Acción <span class="sort-arrow" *ngIf="sortKey()==='accion'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
-        <th class="sortable" (click)="toggleSort('fecha')">Fecha <span class="sort-arrow" *ngIf="sortKey()==='fecha'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let e of filteredEvents()">
-        <td class="num">#{{ e.id }}</td>
-        <td class="mono">{{ e.usuario }}</td>
-        <td>{{ e.accion }}</td>
-        <td class="mono">{{ e.fecha }}</td>
-      </tr>
-      <tr *ngIf="!filteredEvents().length">
-        <td colspan="4" class="text-muted">Sin resultados.</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
+<section class="card mt-lg fade-in">
+  <div class="toolbar">
+    <div class="segmented">
+      @for (k of kinds; track k.key) {
+        <button [class.on]="kind() === k.key" (click)="kind.set(k.key)">{{ k.label }}</button>
+      }
+    </div>
+    <div style="flex:1"></div>
+    <select class="select" style="width:auto;max-width:260px" [value]="user()" (change)="user.set($any($event.target).value)">
+      <option value="">Todos los usuarios</option>
+      @for (u of users(); track u) { <option [value]="u">{{ u }}</option> }
+    </select>
+    <div class="input-wrap" style="min-width:220px">
+      <app-icon name="search" [size]="16" />
+      <input class="input" placeholder="Buscar acción, usuario u orden" [value]="search()" (input)="search.set($any($event.target).value)" />
+    </div>
+  </div>
+
+  @if (events() === null) {
+    @for (i of [1, 2, 3, 4]; track i) { <div class="skeleton sk-line"></div> }
+  } @else {
+    <ul class="timeline">
+      @for (g of groups(); track g.day) {
+        <li class="tl-day">{{ g.day }}</li>
+        @for (e of g.items; track e.id) {
+          <li class="tl-item">
+            <span class="tl-icon tl-icon--{{ ui[kindOf(e.accion)].tone }}"><app-icon [name]="ui[kindOf(e.accion)].icon" [size]="16" /></span>
+            <div>
+              <div class="tl-title">{{ e.accion }}</div>
+              <div class="tl-meta">
+                <span class="chip chip--neutral">{{ ui[kindOf(e.accion)].label }}</span>
+                <span style="display:inline-flex;align-items:center;gap:4px"><app-icon name="user" [size]="13" /> {{ e.usuario }}</span>
+                <span [title]="fmt(e.fecha)">{{ timeAgo(e.fecha) }} · {{ fmt(e.fecha) }}</span>
+                <span class="code-pill">{{ e.servicio }}</span>
+                @if (orderId(e.referencia); as id) {
+                  <a class="code-pill" [routerLink]="['/workorders', id]" style="text-decoration:none;color:var(--accent)">orden #{{ id }}</a>
+                }
+              </div>
+            </div>
+          </li>
+        }
+      } @empty {
+        <li class="empty">
+          <span class="empty-icon"><app-icon name="history" [size]="24" /></span>
+          <h4>Sin eventos</h4>
+          <p>No hay eventos que coincidan con los filtros seleccionados.</p>
+        </li>
+      }
+    </ul>
+  }
+</section>

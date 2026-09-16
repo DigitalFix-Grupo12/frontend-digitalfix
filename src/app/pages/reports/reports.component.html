@@ -1,32 +1,89 @@
-<header class="page-head">
-  <h2>Reportería</h2>
-  <p class="lede">KPIs de la red — últimas 24 horas.</p>
+<header class="page-head fade-in">
+  <div>
+    <div class="eyebrow"><app-icon name="chart" [size]="14" /> Análisis</div>
+    <h1>Reportería de la red</h1>
+    <p>
+      KPIs calculados en línea desde el microservicio de órdenes.
+      @if (kpis(); as k) { <span class="faint">Generado {{ fmt(k.generadoEn) }}</span> }
+    </p>
+  </div>
+  <div class="actions">
+    <div class="segmented">
+      <button [class.on]="range() === 'last24h'" (click)="setRange('last24h')">Últimas 24 h</button>
+      <button [class.on]="range() === 'last7d'" (click)="setRange('last7d')">Últimos 7 días</button>
+    </div>
+    <button class="btn btn--ghost" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [size]="16" /></button>
+  </div>
 </header>
 
-<p *ngIf="error()" class="banner-error">{{ error() }}</p>
+@if (error()) {
+  <div class="alert alert--error"><app-icon name="alert" /><div>{{ error() }}</div></div>
+}
 
-<section class="kpi-row" *ngIf="kpis() as k">
-  <div class="kpi">
-    <span class="kpi-value">{{ k.ordenesPorHora }}</span>
-    <span class="kpi-label">Órdenes por hora</span>
-  </div>
-  <div class="kpi">
-    <span class="kpi-value">{{ k.tiempoResolucionPromedioMin }}<span style="font-size: 14px;">min</span></span>
-    <span class="kpi-label">Resolución promedio</span>
-  </div>
-  <div class="kpi">
-    <span class="kpi-value">{{ k.estadosActivos }}</span>
-    <span class="kpi-label">Estados activos</span>
-  </div>
+<section class="grid grid-4 fade-in">
+  @if (!kpis()) {
+    @for (i of [1, 2, 3, 4]; track i) { <div class="skeleton sk-kpi"></div> }
+  } @else {
+    <div class="card kpi">
+      <div class="kpi-top"><span class="kpi-label">Órdenes en el período</span><span class="kpi-icon kpi-icon--blue"><app-icon name="wrench" /></span></div>
+      <div class="kpi-value">{{ kpis()!.ordenesEnRango }}</div>
+      <div class="kpi-sub">{{ kpis()!.totalOrdenes }} históricas</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-top"><span class="kpi-label">Órdenes por hora</span><span class="kpi-icon kpi-icon--violet"><app-icon name="trend" /></span></div>
+      <div class="kpi-value">{{ kpis()!.ordenesPorHora }}</div>
+      <div class="kpi-sub">promedio del período</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-top"><span class="kpi-label">Resolución promedio</span><span class="kpi-icon kpi-icon--green"><app-icon name="clock" /></span></div>
+      <div class="kpi-value">{{ kpis()!.tiempoResolucionPromedioMin }}<small>min</small></div>
+      <div class="kpi-sub">desde creación hasta cierre</div>
+    </div>
+    <div class="card kpi">
+      <div class="kpi-top"><span class="kpi-label">Órdenes activas</span><span class="kpi-icon kpi-icon--amber"><app-icon name="activity" /></span></div>
+      <div class="kpi-value">{{ kpis()!.estadosActivos }}</div>
+      <div class="kpi-sub">{{ completion() }}% del total ya cerrado</div>
+    </div>
+  }
 </section>
 
-<div class="chart-panel" *ngIf="kpis() as k">
-  <h3 class="chart-title">Órdenes creadas por bloque horario</h3>
-  <div class="bars">
-    <div class="bar-col" *ngFor="let p of k.serie">
-      <div class="bar-value">{{ p.ordenes }}</div>
-      <div class="bar" [style.height.px]="barHeight(p.ordenes)"></div>
-      <div class="bar-label">{{ p.label }}</div>
+<section class="grid grid-main mt-lg fade-in">
+  <div class="card">
+    <div class="card-head">
+      <h3><app-icon name="chart" /> {{ range() === 'last24h' ? 'Órdenes creadas por franja horaria' : 'Órdenes creadas por día' }}</h3>
+      <span class="chip chip--neutral">{{ range() === 'last24h' ? 'bloques de 4 h' : 'últimos 7 días' }}</span>
+    </div>
+    <div class="chart" [style.opacity]="loading() ? 0.5 : 1">
+      <div class="chart-grid"></div>
+      @for (p of kpis()?.serie ?? []; track p.label) {
+        <div class="chart-col">
+          <span class="chart-val">{{ p.ordenes }}</span>
+          <div class="chart-bar" [style.height.%]="barHeight(p.ordenes) * 0.72" [title]="p.label + ': ' + p.ordenes + ' órdenes'"></div>
+          <span class="chart-lbl">{{ p.label }}</span>
+        </div>
+      }
     </div>
   </div>
-</div>
+
+  <div class="card">
+    <div class="card-head"><h3><app-icon name="layers" /> Distribución por estado</h3></div>
+    <div class="donut-wrap">
+      <div class="donut" [style.background]="donut()">
+        <div class="donut-center">
+          <strong>{{ totalStates() }}</strong>
+          <span>órdenes</span>
+        </div>
+      </div>
+      <ul class="legend">
+        @for (s of states(); track s.status) {
+          <li>
+            <span class="sw" [style.background]="s.color"></span>{{ s.label }}
+            <span class="v">{{ s.n }} · {{ totalStates() ? ((s.n / totalStates()) * 100).toFixed(0) : 0 }}%</span>
+          </li>
+        } @empty {
+          <li class="faint">Sin datos para mostrar</li>
+        }
+      </ul>
+    </div>
+  </div>
+</section>

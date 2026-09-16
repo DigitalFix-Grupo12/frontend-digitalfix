@@ -1,31 +1,169 @@
-<header class="page-head">
-  <h2>Dashboard</h2>
-  <p class="lede">Hola {{ authService.getDisplayName() }} — esto es lo que está pasando en la red hoy.</p>
+<header class="page-head fade-in">
+  <div>
+    <div class="eyebrow"><app-icon name="activity" [size]="14" /> {{ today }}</div>
+    <h1>{{ greeting }}, {{ firstName() }}</h1>
+    <p>
+      @if (isCustomer()) {
+        Revisa el avance de tus solicitudes de mantención.
+      } @else if (canOrders()) {
+        Así está la operación de la red eléctrica hoy.
+      } @else if (auth.hasRole('Auditor')) {
+        Supervisa la trazabilidad de cada cambio en el sistema.
+      } @else {
+        Tu cuenta está activa, pero aún no tiene permisos asignados.
+      }
+    </p>
+  </div>
+  @if (canOrders()) {
+    <div class="actions">
+      <a class="btn btn--ghost" routerLink="/workorders"><app-icon name="wrench" [size]="16" /> Ver órdenes</a>
+      <button class="btn btn--primary" (click)="newOrder()"><app-icon name="plus" [size]="16" /> Nueva orden</button>
+    </div>
+  }
 </header>
 
-<section class="kpi-row" *ngIf="orders() as list; else noAccess">
-  <div class="kpi">
-    <span class="kpi-value">{{ activeCount() }}</span>
-    <span class="kpi-label">Órdenes activas</span>
+@if (denied()) {
+  <div class="alert alert--warn fade-in">
+    <app-icon name="lock" />
+    <div style="flex:1">Tu rol no tiene acceso a <strong>/{{ denied() }}</strong>. Pide al administrador el rol correspondiente.</div>
+    <button class="icon-btn" (click)="dismissDenied()" aria-label="Cerrar"><app-icon name="x" [size]="16" /></button>
   </div>
-  <div class="kpi">
-    <span class="kpi-value">{{ pendingAssignCount() }}</span>
-    <span class="kpi-label">Por asignar</span>
-  </div>
-  <div class="kpi">
-    <span class="kpi-value">{{ closedCount() }}</span>
-    <span class="kpi-label">Cerradas</span>
-  </div>
-</section>
+}
 
-<a routerLink="/workorders" class="panel-link" *ngIf="orders()">Ver todas las órdenes de trabajo →</a>
+@if (!hasAnyRole()) {
+  <div class="card fade-in">
+    <div class="empty">
+      <span class="empty-icon"><app-icon name="userCheck" [size]="24" /></span>
+      <h4>Cuenta creada correctamente</h4>
+      <p>
+        Por seguridad, las cuentas nuevas no tienen permisos. Un administrador debe asignarte un rol
+        (Admin, Supervisor, Cliente o Auditor) en Microsoft Entra ID. Luego cierra sesión y vuelve a entrar.
+      </p>
+      <a class="btn btn--ghost mt" routerLink="/session"><app-icon name="key" [size]="16" /> Ver mi sesión</a>
+    </div>
+  </div>
+}
 
-<ng-template #noAccess>
-  <div class="empty-panel" *ngIf="authService.hasRole('Auditor')">
-    Tu rol es de solo lectura sobre el timeline de eventos. Entra a Auditoría para revisar la trazabilidad.
-  </div>
-  <div class="empty-panel" *ngIf="!authService.getRoles().length">
-    Tu cuenta no tiene un rol asignado en Entra ID todavía. Pide al administrador que te asigne uno
-    (Admin, Supervisor, Cliente o Auditor) para ver el contenido correspondiente.
-  </div>
-</ng-template>
+@if (canOrders()) {
+  <section class="grid grid-4 fade-in">
+    @if (orders() === null) {
+      @for (i of [1, 2, 3, 4]; track i) { <div class="skeleton sk-kpi"></div> }
+    } @else {
+      <div class="card kpi">
+        <div class="kpi-top"><span class="kpi-label">Órdenes activas</span><span class="kpi-icon kpi-icon--blue"><app-icon name="activity" /></span></div>
+        <div class="kpi-value">{{ active() }}</div>
+        <div class="kpi-sub">de {{ orders()!.length }} en total</div>
+      </div>
+      <div class="card kpi">
+        <div class="kpi-top"><span class="kpi-label">Por asignar</span><span class="kpi-icon kpi-icon--amber"><app-icon name="flag" /></span></div>
+        <div class="kpi-value">{{ pending() }}</div>
+        <div class="kpi-sub">esperando técnico</div>
+      </div>
+      <div class="card kpi">
+        <div class="kpi-top"><span class="kpi-label">En terreno</span><span class="kpi-icon kpi-icon--violet"><app-icon name="truck" /></span></div>
+        <div class="kpi-value">{{ inField() }}</div>
+        <div class="kpi-sub">asignadas, en ruta o en ejecución</div>
+      </div>
+      <div class="card kpi">
+        <div class="kpi-top"><span class="kpi-label">Cerradas</span><span class="kpi-icon kpi-icon--green"><app-icon name="check" /></span></div>
+        <div class="kpi-value">{{ closed() }}</div>
+        <div class="kpi-sub">trabajos completados</div>
+      </div>
+    }
+  </section>
+
+  <section class="grid grid-main mt-lg fade-in">
+    <div class="card">
+      <div class="card-head">
+        <h3><app-icon name="wrench" /> {{ isCustomer() ? 'Mis órdenes recientes' : 'Órdenes recientes' }}</h3>
+        <a class="btn btn--ghost btn--sm" routerLink="/workorders">Ver todas <app-icon name="chevron" [size]="14" /></a>
+      </div>
+      @if (orders() === null) {
+        @for (i of [1, 2, 3]; track i) { <div class="skeleton sk-line"></div> }
+      } @else {
+        <ul class="list">
+          @for (o of recent(); track o.id) {
+            <li>
+              <a class="list-row" [routerLink]="['/workorders', o.id]">
+                <span class="code-pill">#{{ o.id }}</span>
+                <div class="main-col">
+                  <div class="t">{{ o.descripcion }}</div>
+                  <div class="s">{{ o.clienteId }} · {{ timeAgo(o.createdAt) }}</div>
+                </div>
+                <span [class]="badgeClass(o.status)">{{ statusLabel(o.status) }}</span>
+              </a>
+            </li>
+          } @empty {
+            <li class="empty">
+              <span class="empty-icon"><app-icon name="wrench" [size]="24" /></span>
+              <h4>Sin órdenes todavía</h4>
+              <p>Crea la primera orden de trabajo para comenzar.</p>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+
+    <div class="stack">
+      <div class="card">
+        <div class="card-head"><h3><app-icon name="layers" /> Estado de las órdenes</h3></div>
+        <div class="card-pad">
+          <div class="bar-track" style="height:12px">
+            @for (d of distribution(); track d.status) {
+              <div class="bar-seg" [style.width.%]="d.pct" [style.background]="d.color" [title]="d.label + ': ' + d.n"></div>
+            }
+          </div>
+          <ul class="legend mt">
+            @for (d of distribution(); track d.status) {
+              <li><span class="sw" [style.background]="d.color"></span>{{ d.label }}<span class="v">{{ d.n }}</span></li>
+            } @empty {
+              <li class="faint">Sin datos</li>
+            }
+          </ul>
+        </div>
+      </div>
+
+      @if (kpis(); as k) {
+        <div class="card">
+          <div class="card-head">
+            <h3><app-icon name="trend" /> Rendimiento 24 h</h3>
+            <a class="btn btn--ghost btn--sm" routerLink="/reports">Reportería</a>
+          </div>
+          <div class="grid grid-2 card-pad">
+            <div>
+              <div class="kpi-label">Resolución promedio</div>
+              <div class="kpi-value" style="font-size:24px;margin-top:6px">{{ k.tiempoResolucionPromedioMin }}<small>min</small></div>
+            </div>
+            <div>
+              <div class="kpi-label">Órdenes por hora</div>
+              <div class="kpi-value" style="font-size:24px;margin-top:6px">{{ k.ordenesPorHora }}</div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  </section>
+}
+
+@if (events(); as ev) {
+  <section class="card mt-lg fade-in">
+    <div class="card-head">
+      <h3><app-icon name="history" /> Actividad reciente</h3>
+      <a class="btn btn--ghost btn--sm" routerLink="/audit">Auditoría completa <app-icon name="chevron" [size]="14" /></a>
+    </div>
+    <ul class="list">
+      @for (e of ev; track e.id) {
+        <li class="list-row">
+          <span class="avatar avatar--sm">{{ e.usuario.slice(0, 2).toUpperCase() }}</span>
+          <div class="main-col">
+            <div class="t">{{ e.accion }}</div>
+            <div class="s">{{ e.usuario }} · {{ timeAgo(e.fecha) }}</div>
+          </div>
+          @if (e.referencia) { <span class="code-pill">{{ e.referencia }}</span> }
+        </li>
+      } @empty {
+        <li class="empty"><p>Aún no hay eventos registrados.</p></li>
+      }
+    </ul>
+  </section>
+}
