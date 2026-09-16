@@ -1,25 +1,47 @@
-<header class="topbar">
-  <h1>DigitalFix</h1>
+<ng-container *ngIf="authService.isLoggedIn(); else loginScreen">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <div class="brand-name">DigitalFix</div>
+          <div class="brand-sub">Mantención eléctrica</div>
+        </div>
+      </div>
 
-  <nav *ngIf="authService.isLoggedIn()">
-    <a routerLink="/dashboard">Dashboard</a>
-    <a routerLink="/workorders" *ngIf="authService.hasRole('Admin','Supervisor','Cliente')">Órdenes de trabajo</a>
-    <a routerLink="/catalog" *ngIf="authService.hasRole('Admin','Supervisor')">Catálogo</a>
-    <a routerLink="/reports" *ngIf="authService.hasRole('Admin')">Reportería</a>
-    <a routerLink="/audit" *ngIf="authService.hasRole('Admin','Auditor')">Auditoría</a>
-  </nav>
+      <nav class="nav">
+        <a routerLink="/dashboard" routerLinkActive="active">
+          <span class="nav-dot" aria-hidden="true"></span>Dashboard
+        </a>
+        <a routerLink="/workorders" routerLinkActive="active" *ngIf="authService.hasRole('Admin','Supervisor','Cliente')">
+          <span class="nav-dot" aria-hidden="true"></span>Órdenes de trabajo
+        </a>
+        <a routerLink="/catalog" routerLinkActive="active" *ngIf="authService.hasRole('Admin','Supervisor')">
+          <span class="nav-dot" aria-hidden="true"></span>Catálogo
+        </a>
+        <a routerLink="/reports" routerLinkActive="active" *ngIf="authService.hasRole('Admin')">
+          <span class="nav-dot" aria-hidden="true"></span>Reportería
+        </a>
+        <a routerLink="/audit" routerLinkActive="active" *ngIf="authService.hasRole('Admin','Auditor')">
+          <span class="nav-dot" aria-hidden="true"></span>Auditoría
+        </a>
+      </nav>
 
-  <div class="session">
-    <ng-container *ngIf="authService.isLoggedIn(); else loggedOut">
-      <span>{{ authService.getDisplayName() }} ({{ authService.getRoles().join(', ') || 'sin rol asignado' }})</span>
-      <button (click)="logout()">Cerrar sesión</button>
-    </ng-container>
-    <ng-template #loggedOut>
-      <button (click)="login()">Iniciar sesión con Microsoft</button>
-    </ng-template>
+      <div class="account">
+        <div class="account-name">{{ authService.getDisplayName() }}</div>
+        <div class="account-role">{{ authService.getRoles().join(', ') || 'Sin rol asignado' }}</div>
+        <button class="btn-ghost" (click)="logout()">Cerrar sesión</button>
+      </div>
+    </aside>
+
+    <main class="content">
+      <router-outlet></router-outlet>
+    </main>
   </div>
-</header>
+</ng-container>
 
-<main>
+<ng-template #loginScreen>
   <router-outlet></router-outlet>
-</main>
+</ng-template>
+
+<app-toast-tray></app-toast-tray>

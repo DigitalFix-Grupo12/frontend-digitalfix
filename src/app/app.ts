@@ -1,16 +1,17 @@
 import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet, RouterLink } from '@angular/router';
+import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { MsalBroadcastService } from '@azure/msal-angular';
 import { EventMessage, EventType, AuthenticationResult } from '@azure/msal-browser';
 import { Subject } from 'rxjs';
 import { filter, takeUntil } from 'rxjs/operators';
 import { AuthService } from './core/services/auth.service';
+import { ToastTrayComponent } from './core/components/toast/toast-tray.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, ToastTrayComponent],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
@@ -21,18 +22,10 @@ export class App implements OnInit, OnDestroy {
   private destroy$ = new Subject<void>();
 
   ngOnInit(): void {
-    // provideAppInitializer ya corrió instance.initialize() (y
-    // handleRedirectPromise() si veníamos de un login) ANTES de que este
-    // componente exista, así que si hay una cuenta activa ya podemos pedir
-    // roles ahora mismo -- no hace falta esperar un evento que puede haber
-    // ocurrido antes de que nos suscribiéramos a él.
     if (this.authService.isLoggedIn()) {
       void this.authService.refreshRoles();
     }
 
-    // Igual escuchamos futuros logins/logouts que ocurran DESPUÉS de que
-    // el componente ya existe (ej: el usuario hace clic en "Iniciar sesión"
-    // sin recargar la página completa).
     this.msalBroadcastService.msalSubject$
       .pipe(
         takeUntil(this.destroy$),

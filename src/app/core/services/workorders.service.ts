@@ -44,7 +44,7 @@ export class WorkordersService {
     return this.http.post<WorkOrder>(this.baseUrl, order);
   }
 
-  updateStatus(id: number, status: WorkOrderStatus): Observable<WorkOrder> {
-    return this.http.put<WorkOrder>(`${this.baseUrl}/${id}/status`, { status });
+  updateStatus(id: number, status: WorkOrderStatus, tecnicoId?: string): Observable<WorkOrder> {
+    return this.http.put<WorkOrder>(`${this.baseUrl}/${id}/status`, { status, tecnicoId });
   }
 }

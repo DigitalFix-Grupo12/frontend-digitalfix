@@ -1,7 +1,32 @@
-<h2>Reportería (últimas 24h)</h2>
-<p *ngIf="error()" class="error">{{ error() }}</p>
-<ul *ngIf="kpis() as k">
-  <li>Órdenes por hora: {{ k.ordenesPorHora }}</li>
-  <li>Tiempo de resolución promedio: {{ k.tiempoResolucionPromedioMin }} min</li>
-  <li>Estados activos: {{ k.estadosActivos }}</li>
-</ul>
+<header class="page-head">
+  <h2>Reportería</h2>
+  <p class="lede">KPIs de la red — últimas 24 horas.</p>
+</header>
+
+<p *ngIf="error()" class="banner-error">{{ error() }}</p>
+
+<section class="kpi-row" *ngIf="kpis() as k">
+  <div class="kpi">
+    <span class="kpi-value">{{ k.ordenesPorHora }}</span>
+    <span class="kpi-label">Órdenes por hora</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-value">{{ k.tiempoResolucionPromedioMin }}<span style="font-size: 14px;">min</span></span>
+    <span class="kpi-label">Resolución promedio</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-value">{{ k.estadosActivos }}</span>
+    <span class="kpi-label">Estados activos</span>
+  </div>
+</section>
+
+<div class="chart-panel" *ngIf="kpis() as k">
+  <h3 class="chart-title">Órdenes creadas por bloque horario</h3>
+  <div class="bars">
+    <div class="bar-col" *ngFor="let p of k.serie">
+      <div class="bar-value">{{ p.ordenes }}</div>
+      <div class="bar" [style.height.px]="barHeight(p.ordenes)"></div>
+      <div class="bar-label">{{ p.label }}</div>
+    </div>
+  </div>
+</div>

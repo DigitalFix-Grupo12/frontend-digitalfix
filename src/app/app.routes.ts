@@ -5,6 +5,7 @@ import { roleGuard } from './core/guards/role.guard';
 import { LoginComponent } from './pages/login/login.component';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { WorkordersComponent } from './pages/workorders/workorders.component';
+import { WorkorderDetailComponent } from './pages/workorder-detail/workorder-detail.component';
 import { CatalogComponent } from './pages/catalog/catalog.component';
 import { ReportsComponent } from './pages/reports/reports.component';
 import { AuditComponent } from './pages/audit/audit.component';
@@ -20,6 +21,12 @@ export const routes: Routes = [
   {
     path: 'workorders',
     component: WorkordersComponent,
+    canActivate: [MsalGuard, roleGuard],
+    data: { roles: ['Admin', 'Supervisor', 'Cliente'] },
+  },
+  {
+    path: 'workorders/:id',
+    component: WorkorderDetailComponent,
     canActivate: [MsalGuard, roleGuard],
     data: { roles: ['Admin', 'Supervisor', 'Cliente'] },
   },

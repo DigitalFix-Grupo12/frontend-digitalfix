@@ -1,10 +1,31 @@
-<h2>Dashboard</h2>
-<p>Hola {{ authService.getDisplayName() }}.</p>
+<header class="page-head">
+  <h2>Dashboard</h2>
+  <p class="lede">Hola {{ authService.getDisplayName() }} — esto es lo que está pasando en la red hoy.</p>
+</header>
 
-<ng-container [ngSwitch]="true">
-  <p *ngSwitchCase="authService.hasRole('Admin')">Vista Admin: aquí van los KPIs de la red (ver /reports).</p>
-  <p *ngSwitchCase="authService.hasRole('Supervisor')">Vista Supervisor: órdenes por asignar y en terreno.</p>
-  <p *ngSwitchCase="authService.hasRole('Cliente')">Vista Cliente: tus últimas órdenes y su estado.</p>
-  <p *ngSwitchCase="authService.hasRole('Auditor')">Vista Auditor: accede a /audit para el timeline de eventos.</p>
-  <p *ngSwitchDefault>Tu cuenta no tiene un rol asignado en Entra ID. Contacta al administrador.</p>
-</ng-container>
+<section class="kpi-row" *ngIf="orders() as list; else noAccess">
+  <div class="kpi">
+    <span class="kpi-value">{{ activeCount() }}</span>
+    <span class="kpi-label">Órdenes activas</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-value">{{ pendingAssignCount() }}</span>
+    <span class="kpi-label">Por asignar</span>
+  </div>
+  <div class="kpi">
+    <span class="kpi-value">{{ closedCount() }}</span>
+    <span class="kpi-label">Cerradas</span>
+  </div>
+</section>
+
+<a routerLink="/workorders" class="panel-link" *ngIf="orders()">Ver todas las órdenes de trabajo →</a>
+
+<ng-template #noAccess>
+  <div class="empty-panel" *ngIf="authService.hasRole('Auditor')">
+    Tu rol es de solo lectura sobre el timeline de eventos. Entra a Auditoría para revisar la trazabilidad.
+  </div>
+  <div class="empty-panel" *ngIf="!authService.getRoles().length">
+    Tu cuenta no tiene un rol asignado en Entra ID todavía. Pide al administrador que te asigne uno
+    (Admin, Supervisor, Cliente o Auditor) para ver el contenido correspondiente.
+  </div>
+</ng-template>

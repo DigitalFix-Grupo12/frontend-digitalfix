@@ -1,8 +1,39 @@
-<h2>Catálogo técnico</h2>
-<p *ngIf="error()" class="error">{{ error() }}</p>
-<table>
-  <thead><tr><th>ID</th><th>Servicio</th><th>Stock</th><th>Tarifa</th></tr></thead>
-  <tbody>
-    <tr *ngFor="let i of items()"><td>{{ i.id }}</td><td>{{ i.nombre }}</td><td>{{ i.stock }}</td><td>{{ i.tarifa }}</td></tr>
-  </tbody>
-</table>
+<header class="page-head">
+  <h2>Catálogo técnico</h2>
+  <p class="lede">Servicios y repuestos disponibles para las órdenes de trabajo.</p>
+</header>
+
+<p *ngIf="error()" class="banner-error">{{ error() }}</p>
+
+<div class="field-row">
+  <input
+    class="search-input"
+    [ngModel]="search()"
+    (ngModelChange)="search.set($event)"
+    placeholder="Buscar servicio..."
+  />
+</div>
+
+<div class="data-table">
+  <table>
+    <thead>
+      <tr>
+        <th class="sortable" (click)="toggleSort('id')">ID <span class="sort-arrow" *ngIf="sortKey()==='id'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th class="sortable" (click)="toggleSort('nombre')">Servicio <span class="sort-arrow" *ngIf="sortKey()==='nombre'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th class="sortable" (click)="toggleSort('stock')">Stock <span class="sort-arrow" *ngIf="sortKey()==='stock'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th class="sortable" (click)="toggleSort('tarifa')">Tarifa <span class="sort-arrow" *ngIf="sortKey()==='tarifa'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let i of filteredItems()">
+        <td class="num">#{{ i.id }}</td>
+        <td>{{ i.nombre }}</td>
+        <td class="mono">{{ i.stock }}</td>
+        <td class="mono">${{ i.tarifa }}</td>
+      </tr>
+      <tr *ngIf="!filteredItems().length">
+        <td colspan="4" class="text-muted">Sin resultados.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

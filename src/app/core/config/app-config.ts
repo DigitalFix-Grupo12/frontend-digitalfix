@@ -1,13 +1,10 @@
 /**
- * Configuración central de la app (Azure Entra ID + API Gateway).
+ * Configuración central de la app (Azure Entra ID + AWS API Gateway).
  *
  * IMPORTANTE: estos valores NO son secretos (Client ID y Tenant ID son públicos),
  * pero sí son específicos de tu registro de aplicación. El script
  * `scripts/Register-EntraApps.ps1` los imprime al final de su ejecución;
  * cópialos aquí tal cual.
- *
- * Para producción, reemplaza esto por un fetch a /assets/config.json generado
- * en el pipeline de build, así no hardcodeas IDs por ambiente.
  */
 export const appConfig = {
   azureAd: {
@@ -22,8 +19,8 @@ export const appConfig = {
   api: {
     // Application ID URI del registro de la API "digitalfix-api" (ver PowerShell)
     scope: 'api://fb8ea665-ee45-4790-8112-eade3bd230e5/access_as_user',
-    // Base URL del BFF. En local: http://localhost:8080
-    // En AWS: la URL de tu API Gateway (HTTP API) + stage
-    baseUrl: 'http://localhost:8080',
+    // BFF desplegado en EC2 y protegido por AWS API Gateway (HTTP API).
+    // El BFF ya no se llama directo -- todo el trafico pasa por el Gateway.
+    baseUrl: 'https://7s6qn2mb8h.execute-api.us-east-1.amazonaws.com',
   },
 };

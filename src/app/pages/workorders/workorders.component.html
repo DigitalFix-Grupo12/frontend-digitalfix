@@ -1,29 +1,59 @@
-<h2>Órdenes de trabajo</h2>
+<header class="page-head">
+  <h2>Órdenes de trabajo</h2>
+  <p class="lede">Ciclo de vida: creada → asignada → en desplazamiento → en ejecución → cerrada.</p>
+</header>
 
-<p *ngIf="error()" class="error">{{ error() }}</p>
-<p *ngIf="loading()">Cargando...</p>
+<p *ngIf="error()" class="banner-error">{{ error() }}</p>
 
-<form *ngIf="canCreate()" [formGroup]="form" (ngSubmit)="create()" class="new-order">
+<form *ngIf="canCreate()" [formGroup]="form" (ngSubmit)="create()" class="field-row">
   <input formControlName="descripcion" placeholder="Descripción del trabajo" />
   <input formControlName="clienteId" placeholder="ID cliente" />
-  <button type="submit" [disabled]="form.invalid">Crear orden</button>
+  <button type="submit" class="btn btn--primary" [disabled]="form.invalid">Crear orden</button>
 </form>
 
-<table *ngIf="!loading()">
-  <thead>
-    <tr><th>ID</th><th>Descripción</th><th>Cliente</th><th>Estado</th><th *ngIf="canAdvance()"></th></tr>
-  </thead>
-  <tbody>
-    <tr *ngFor="let o of orders()">
-      <td>{{ o.id }}</td>
-      <td>{{ o.descripcion }}</td>
-      <td>{{ o.clienteId }}</td>
-      <td>{{ o.status }}</td>
-      <td *ngIf="canAdvance()">
-        <button *ngIf="nextStatus[o.status]" (click)="advance(o)">
-          Avanzar a {{ nextStatus[o.status] }}
-        </button>
-      </td>
-    </tr>
-  </tbody>
-</table>
+<div class="field-row">
+  <select [ngModel]="statusFilter()" (ngModelChange)="statusFilter.set($event)" [ngModelOptions]="{standalone: true}">
+    <option value="ALL">Todos los estados</option>
+    <option *ngFor="let s of statuses" [value]="s">{{ s }}</option>
+  </select>
+  <input
+    class="search-input"
+    [ngModel]="search()"
+    (ngModelChange)="search.set($event)"
+    [ngModelOptions]="{standalone: true}"
+    placeholder="Buscar por descripción, cliente o ID..."
+  />
+  <span class="text-muted">{{ filteredOrders().length }} orden(es)</span>
+</div>
+
+<p *ngIf="loading()" class="text-muted">Cargando...</p>
+
+<div class="data-table" *ngIf="!loading()">
+  <table>
+    <thead>
+      <tr>
+        <th class="sortable" (click)="toggleSort('id')">ID <span class="sort-arrow" *ngIf="sortKey()==='id'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th class="sortable" (click)="toggleSort('descripcion')">Descripción <span class="sort-arrow" *ngIf="sortKey()==='descripcion'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th class="sortable" (click)="toggleSort('clienteId')">Cliente <span class="sort-arrow" *ngIf="sortKey()==='clienteId'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th class="sortable" (click)="toggleSort('status')">Estado <span class="sort-arrow" *ngIf="sortKey()==='status'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th *ngIf="canAdvance()"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let o of filteredOrders()" class="clickable" (click)="openDetail(o)">
+        <td class="num">#{{ o.id }}</td>
+        <td>{{ o.descripcion }}</td>
+        <td class="mono">{{ o.clienteId }}</td>
+        <td><span [class]="pillClass(o.status)">{{ o.status }}</span></td>
+        <td *ngIf="canAdvance()">
+          <button *ngIf="nextStatus[o.status]" class="btn btn--subtle" (click)="advance(o, $event)">
+            {{ o.status === 'CREADA' ? 'Asignar →' : 'Avanzar a ' + nextStatus[o.status] }}
+          </button>
+        </td>
+      </tr>
+      <tr *ngIf="!filteredOrders().length">
+        <td colspan="5" class="text-muted">No hay órdenes con ese filtro.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

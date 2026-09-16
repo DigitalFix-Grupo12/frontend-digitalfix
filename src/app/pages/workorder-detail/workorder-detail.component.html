@@ -1,0 +1,48 @@
+<header class="page-head">
+  <button class="panel-link" style="background:none;border:none;padding:0;cursor:pointer;" (click)="back()">← Volver a órdenes</button>
+</header>
+
+<p *ngIf="loading()" class="text-muted">Cargando...</p>
+<p *ngIf="notFound()" class="banner-error">No se encontró esa orden de trabajo.</p>
+
+<ng-container *ngIf="order() as o">
+  <header class="page-head">
+    <h2>Orden #{{ o.id }}</h2>
+    <p class="lede">{{ o.descripcion }}</p>
+  </header>
+
+  <div class="detail-grid">
+    <div class="detail-item">
+      <span class="detail-label">Cliente</span>
+      <span class="mono">{{ o.clienteId }}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Técnico asignado</span>
+      <span class="mono">{{ o.tecnicoId || '— sin asignar —' }}</span>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Estado actual</span>
+      <span class="mono">{{ o.status }}</span>
+    </div>
+  </div>
+
+  <div class="advance-panel" *ngIf="canAdvance() && nextStatus[o.status]">
+    <h3 style="font-size: 14px; margin-bottom: 10px;">Avanzar estado</h3>
+
+    <div class="field-row" *ngIf="needsTechnician()">
+      <input
+        [ngModel]="tecnicoId()"
+        (ngModelChange)="tecnicoId.set($event)"
+        placeholder="ID o nombre del técnico a asignar"
+      />
+    </div>
+
+    <button class="btn btn--primary" (click)="advance()">
+      Avanzar a {{ nextStatus[o.status] }}
+    </button>
+  </div>
+
+  <p class="text-muted" *ngIf="canAdvance() && !nextStatus[o.status]">
+    Esta orden ya está en un estado final.
+  </p>
+</ng-container>

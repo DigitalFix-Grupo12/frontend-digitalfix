@@ -1,8 +1,39 @@
-<h2>Auditoría · Timeline de eventos</h2>
-<p *ngIf="error()" class="error">{{ error() }}</p>
-<table>
-  <thead><tr><th>ID</th><th>Usuario</th><th>Acción</th><th>Fecha</th></tr></thead>
-  <tbody>
-    <tr *ngFor="let e of events()"><td>{{ e.id }}</td><td>{{ e.usuario }}</td><td>{{ e.accion }}</td><td>{{ e.fecha }}</td></tr>
-  </tbody>
-</table>
+<header class="page-head">
+  <h2>Auditoría</h2>
+  <p class="lede">Timeline de eventos — solo lectura.</p>
+</header>
+
+<p *ngIf="error()" class="banner-error">{{ error() }}</p>
+
+<div class="field-row">
+  <input
+    class="search-input"
+    [ngModel]="search()"
+    (ngModelChange)="search.set($event)"
+    placeholder="Buscar por usuario o acción..."
+  />
+</div>
+
+<div class="data-table">
+  <table>
+    <thead>
+      <tr>
+        <th class="sortable" (click)="toggleSort('id')">ID <span class="sort-arrow" *ngIf="sortKey()==='id'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th class="sortable" (click)="toggleSort('usuario')">Usuario <span class="sort-arrow" *ngIf="sortKey()==='usuario'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th class="sortable" (click)="toggleSort('accion')">Acción <span class="sort-arrow" *ngIf="sortKey()==='accion'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+        <th class="sortable" (click)="toggleSort('fecha')">Fecha <span class="sort-arrow" *ngIf="sortKey()==='fecha'">{{ sortDir() === 1 ? '↑' : '↓' }}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let e of filteredEvents()">
+        <td class="num">#{{ e.id }}</td>
+        <td class="mono">{{ e.usuario }}</td>
+        <td>{{ e.accion }}</td>
+        <td class="mono">{{ e.fecha }}</td>
+      </tr>
+      <tr *ngIf="!filteredEvents().length">
+        <td colspan="4" class="text-muted">Sin resultados.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>

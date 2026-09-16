@@ -1,1 +1,456 @@
-/* You can add global styles to this file, and also import other style files */
+/* ==========================================================================
+   DigitalFix — Design tokens
+   Panel operativo de mantención eléctrica. Paleta ink/navy con acento
+   ámbar-cobre; los colores de estado (verde/ámbar/rojo) quedan reservados
+   exclusivamente para el estado de las órdenes de trabajo, nunca para UI.
+   ========================================================================== */
+:root {
+  /* Superficies */
+  --ink: #0b1220;
+  --surface: #121a2b;
+  --surface-2: #1b2740;
+  --surface-3: #24304d;
+  --line: #2a3752;
+  --line-soft: #1e293e;
+
+  /* Texto */
+  --text: #e7ecf5;
+  --text-muted: #93a1be;
+  --text-faint: #5c6c8c;
+
+  /* Acento de marca */
+  --accent: #f0a202;
+  --accent-dim: #b87a04;
+  --accent-ink: #1a1200;
+
+  /* Estados de orden de trabajo (únicamente para esto) */
+  --state-open: #60a5fa;
+  --state-progress: #f0a202;
+  --state-done: #34d399;
+  --state-cancel: #6b7280;
+  --state-danger: #f87171;
+
+  /* Tipografía */
+  --font-ui: 'IBM Plex Sans', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Radios / sombras */
+  --radius: 8px;
+  --shadow-panel: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 24px -12px rgba(0, 0, 0, 0.5);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.25em;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input,
+select {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ==========================================================================
+   Clases compartidas entre las páginas internas (dashboard, workorders,
+   catalog, reports, audit). Viven acá porque son globales, no scoped a un
+   solo componente.
+   ========================================================================== */
+
+.page-head {
+  margin-bottom: 24px;
+}
+
+.page-head h2 {
+  font-size: 19px;
+}
+
+.lede {
+  color: var(--text-muted);
+  font-size: 13.5px;
+  margin: 0;
+}
+
+/* KPI tiles */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+  max-width: 560px;
+}
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
+.kpi-value {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.kpi-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.panel-link {
+  display: inline-block;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.panel-link:hover {
+  text-decoration: underline;
+}
+
+.empty-panel {
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 20px;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  max-width: 480px;
+  line-height: 1.6;
+}
+
+/* Data tables */
+.data-table {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.data-table table {
+  font-size: 13px;
+}
+
+.data-table th {
+  text-align: left;
+  font-size: 11px;
+  text-transform: none;
+  color: var(--text-faint);
+  font-weight: 500;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.data-table td {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--text);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr:hover td {
+  background: var(--surface-2);
+}
+
+.data-table .num,
+.data-table .mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* Status pills — únicos elementos que usan los colores de estado */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 100px;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.pill--open {
+  color: var(--state-open);
+  background: color-mix(in srgb, var(--state-open) 14%, transparent);
+}
+.pill--open::before {
+  background: var(--state-open);
+}
+
+.pill--progress {
+  color: var(--state-progress);
+  background: color-mix(in srgb, var(--state-progress) 14%, transparent);
+}
+.pill--progress::before {
+  background: var(--state-progress);
+}
+
+.pill--done {
+  color: var(--state-done);
+  background: color-mix(in srgb, var(--state-done) 14%, transparent);
+}
+.pill--done::before {
+  background: var(--state-done);
+}
+
+.pill--cancel {
+  color: var(--state-cancel);
+  background: color-mix(in srgb, var(--state-cancel) 18%, transparent);
+}
+.pill--cancel::before {
+  background: var(--state-cancel);
+}
+
+/* Buttons (para las páginas internas, distintos de los de app.css) */
+.btn {
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn--primary:hover:not(:disabled) {
+  background: #ffb520;
+}
+.btn--primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn--subtle {
+  background: var(--surface-3);
+  color: var(--text);
+  border-color: var(--line);
+}
+.btn--subtle:hover {
+  border-color: var(--text-faint);
+}
+
+/* Forms */
+.field-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.field-row input,
+.field-row select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 8px 11px;
+  font-size: 13px;
+}
+
+.field-row input:focus,
+.field-row select:focus {
+  border-color: var(--accent);
+}
+
+.field-row input::placeholder {
+  color: var(--text-faint);
+}
+
+/* Banners */
+.banner-error {
+  background: color-mix(in srgb, var(--state-danger) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--state-danger) 40%, var(--line));
+  color: #fecaca;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.text-muted {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Detalle de orden de trabajo */
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  max-width: 640px;
+  margin-bottom: 24px;
+}
+
+.detail-item {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-label {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.advance-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  max-width: 420px;
+}
+
+/* Filas clicables (tablas que llevan a un detalle) */
+.data-table tbody tr.clickable {
+  cursor: pointer;
+}
+
+/* Encabezados de tabla ordenables */
+.data-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.data-table th.sortable:hover {
+  color: var(--text);
+}
+
+.sort-arrow {
+  font-size: 10px;
+  margin-left: 3px;
+  color: var(--accent);
+}
+
+.search-input {
+  min-width: 220px;
+}
+
+/* Gráfico de barras (Reportería) */
+.chart-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+  max-width: 560px;
+}
+
+.chart-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  height: 150px;
+}
+
+.bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.bar-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.bar {
+  width: 100%;
+  max-width: 34px;
+  background: linear-gradient(180deg, var(--accent), var(--accent-dim));
+  border-radius: 4px 4px 0 0;
+  transition: height 0.3s ease;
+}
+
+.bar-label {
+  font-size: 10.5px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  margin-top: 8px;
+}
