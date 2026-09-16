@@ -1,5 +1,5 @@
 /**
- * Configuración central de la app (Azure Entra ID + AWS API Gateway).
+ * Configuración central de la app (Azure Entra ID + backend).
  *
  * IMPORTANTE: estos valores NO son secretos (Client ID y Tenant ID son públicos),
  * pero sí son específicos de tu registro de aplicación. El script
@@ -19,8 +19,9 @@ export const appConfig = {
   api: {
     // Application ID URI del registro de la API "digitalfix-api" (ver PowerShell)
     scope: 'api://fb8ea665-ee45-4790-8112-eade3bd230e5/access_as_user',
-    // BFF desplegado en EC2 y protegido por AWS API Gateway (HTTP API).
-    // El BFF ya no se llama directo -- todo el trafico pasa por el Gateway.
-    baseUrl: 'https://7s6qn2mb8h.execute-api.us-east-1.amazonaws.com',
+    // TEMPORAL: BFF local mientras probamos la nueva arquitectura de
+    // microservicios. Antes de la entrega final, volver a la URL del
+    // API Gateway (https://7s6qn2mb8h.execute-api.us-east-1.amazonaws.com).
+    baseUrl: 'http://localhost:8080',
   },
 };
