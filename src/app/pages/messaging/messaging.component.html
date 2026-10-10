@@ -1,0 +1,291 @@
+<header class="page-head fade-in">
+  <div>
+    <div class="eyebrow"><app-icon name="layers" [size]="14" /> Plataforma</div>
+    <h1>Mensajería RabbitMQ</h1>
+    <p>Clúster, colas de trabajo, DLQ, exchanges y bindings. Administrado por <span class="code-pill">ms-digitalfix-rabbit-admin</span>.</p>
+  </div>
+  <div class="actions">
+    <label class="chip chip--neutral" style="cursor:pointer;gap:6px">
+      <input type="checkbox" [checked]="autoRefresh()" (change)="autoRefresh.set(checked($event))" /> Auto 5 s
+    </label>
+    <button class="btn btn--ghost" (click)="load()"><app-icon name="refresh" [size]="16" /> Actualizar</button>
+    <button class="btn btn--primary" (click)="open('publish')"><app-icon name="send" [size]="16" /> Publicar prueba</button>
+  </div>
+</header>
+
+@if (error()) {
+  <div class="alert alert--error"><app-icon name="alert" /><div>{{ error() }}</div></div>
+}
+
+<section class="grid grid-4 fade-in">
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Nodos del clúster</span><span class="kpi-icon kpi-icon--green"><app-icon name="server" /></span></div>
+    <div class="kpi-value">{{ runningNodes() }}<small>/ {{ overview()?.nodes?.length ?? 0 }}</small></div>
+    <div class="kpi-sub">{{ overview()?.clusterName ?? '—' }} · RabbitMQ {{ overview()?.rabbitmqVersion ?? '' }}</div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Colas de trabajo</span><span class="kpi-icon kpi-icon--blue"><app-icon name="queue" /></span></div>
+    <div class="kpi-value">{{ mainQueues().length }}<small>+ {{ dlqs().length }} DLQ</small></div>
+    <div class="kpi-sub">{{ overview()?.consumers ?? 0 }} consumidores · {{ overview()?.connections ?? 0 }} conexiones</div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Mensajes pendientes</span><span class="kpi-icon kpi-icon--amber"><app-icon name="inbox" /></span></div>
+    <div class="kpi-value">{{ overview()?.messagesReady ?? 0 }}</div>
+    <div class="kpi-sub">{{ overview()?.messagesUnacked ?? 0 }} sin ACK (en proceso)</div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">En DLQ</span><span class="kpi-icon kpi-icon--violet"><app-icon name="alert" /></span></div>
+    <div class="kpi-value" [style.color]="dlqTotal() ? 'var(--red)' : null">{{ dlqTotal() }}</div>
+    <div class="kpi-sub">mensajes rechazados a revisar</div>
+  </div>
+</section>
+
+<section class="card mt-lg fade-in">
+  <div class="card-head card-pad"><h3><app-icon name="server" /> Nodos</h3></div>
+  <div class="kv">
+    @for (n of overview()?.nodes ?? []; track n.name) {
+      <div>
+        <dt><span class="dot" [class.dot--on]="n.running" [class.dot--off]="!n.running"></span> {{ n.running ? 'en ejecución' : 'detenido' }}</dt>
+        <dd class="mono">{{ n.name }}</dd>
+        <dd class="muted" style="font-size:12px">{{ n.memUsedMb }} MB · activo {{ uptime(n.uptimeMinutes) }}</dd>
+      </div>
+    } @empty {
+      <div><dd class="muted">Sin información del clúster</dd></div>
+    }
+  </div>
+</section>
+
+<section class="card mt-lg fade-in">
+  <div class="toolbar">
+    <h3 style="font-size:14.5px;display:flex;gap:8px;align-items:center"><app-icon name="queue" /> Colas</h3>
+    <div style="flex:1"></div>
+    <button class="btn btn--ghost btn--sm" (click)="open('queue')"><app-icon name="plus" [size]="14" /> Nueva cola</button>
+  </div>
+  @if (queues() === null) {
+    @for (i of [1, 2, 3]; track i) { <div class="skeleton sk-line"></div> }
+  } @else {
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr><th>Cola</th><th>Nodo</th><th>Listos</th><th>Sin ACK</th><th>Consumidores</th><th>Bindings</th><th></th></tr>
+        </thead>
+        <tbody>
+          @for (q of queues(); track q.name) {
+            <tr>
+              <td>
+                <div class="title mono">
+                  @if (q.isProtected) { <span title="Cola del sistema (protegida)"><app-icon name="lock" [size]="13" /></span> }
+                  {{ q.name }}
+                </div>
+                <div class="sub">
+                  @if (q.deadLetterQueue) { <span class="badge badge--danger">DLQ</span> }
+                  @if (q.deadLetterRoutingKey) { DLX {{ q.deadLetterExchange }} → {{ q.deadLetterRoutingKey }} }
+                  @if (q.messageTtlMs) { · TTL {{ q.messageTtlMs }} ms }
+                  @if (!q.durable) { · no durable }
+                </div>
+              </td>
+              <td class="mono">{{ shortNode(q.node) }}</td>
+              <td class="mono" [style.color]="q.deadLetterQueue && q.messagesReady ? 'var(--red)' : null">{{ q.messagesReady }}</td>
+              <td class="mono">{{ q.messagesUnacked }}</td>
+              <td class="mono">{{ q.consumers }}</td>
+              <td>
+                @for (b of bindingsByQueue().get(q.name) ?? []; track b.exchange + b.routingKey) {
+                  <span class="code-pill" style="margin:2px">{{ b.exchange }} · {{ b.routingKey || '∅' }}</span>
+                }
+              </td>
+              <td style="white-space:nowrap;text-align:right">
+                <button class="btn btn--ghost btn--sm" (click)="peek(q)" title="Ver mensajes sin consumirlos"><app-icon name="eye" [size]="14" /></button>
+                @if (q.deadLetterQueue) {
+                  <button class="btn btn--ghost btn--sm" (click)="replay(q)" [disabled]="!q.messagesReady || busy()" title="Devolver a la cola de origen">
+                    <app-icon name="refresh" [size]="14" /> Reprocesar
+                  </button>
+                }
+                <button class="btn btn--ghost btn--sm" (click)="purge(q)" [disabled]="!q.messagesReady || busy()" title="Vaciar"><app-icon name="x" [size]="14" /></button>
+                <button class="btn btn--danger btn--sm" (click)="deleteQueue(q)" [disabled]="q.isProtected || busy()"
+                        [title]="q.isProtected ? 'Cola del sistema: no se puede eliminar' : 'Eliminar'"><app-icon name="trash" [size]="14" /></button>
+              </td>
+            </tr>
+          } @empty {
+            <tr><td colspan="7"><div class="empty"><h4>Sin colas</h4><p>Los microservicios declaran sus colas al conectarse.</p></div></td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
+
+<section class="grid grid-2 mt-lg fade-in">
+  <div class="card">
+    <div class="toolbar">
+      <h3 style="font-size:14.5px;display:flex;gap:8px;align-items:center"><app-icon name="gateway" /> Exchanges</h3>
+      <div style="flex:1"></div>
+      <button class="btn btn--ghost btn--sm" (click)="open('exchange')"><app-icon name="plus" [size]="14" /> Nuevo</button>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Nombre</th><th>Tipo</th><th></th></tr></thead>
+        <tbody>
+          @for (e of exchanges(); track e.name) {
+            <tr>
+              <td class="mono">@if (e.isProtected) { <app-icon name="lock" [size]="13" /> } {{ e.name }}</td>
+              <td><span class="chip">{{ e.type }}</span></td>
+              <td style="text-align:right">
+                <button class="btn btn--danger btn--sm" (click)="deleteExchange(e)" [disabled]="e.isProtected || busy()"><app-icon name="trash" [size]="14" /></button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <h3 style="font-size:14.5px;display:flex;gap:8px;align-items:center"><app-icon name="link" /> Bindings</h3>
+      <div style="flex:1"></div>
+      <button class="btn btn--ghost btn--sm" (click)="open('binding')"><app-icon name="plus" [size]="14" /> Nuevo</button>
+    </div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead><tr><th>Exchange</th><th>Routing key</th><th>Cola</th><th></th></tr></thead>
+        <tbody>
+          @for (b of bindings(); track b.exchange + b.queue + b.routingKey) {
+            <tr>
+              <td class="mono">{{ b.exchange }}</td>
+              <td><span class="code-pill">{{ b.routingKey || '∅' }}</span></td>
+              <td class="mono">{{ b.queue }}</td>
+              <td style="text-align:right">
+                <button class="btn btn--danger btn--sm" (click)="deleteBinding(b)" [disabled]="busy()"><app-icon name="trash" [size]="14" /></button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ------------------------------------------------------------ Drawers -->
+@if (panel() || peekQueue()) {
+  <div class="backdrop" (click)="close(); closePeek()"></div>
+}
+
+@if (panel(); as p) {
+  <aside class="drawer" style="width:min(520px,100%)">
+    <div class="drawer-head">
+      <h3>
+        @switch (p) {
+          @case ('queue') { Nueva cola }
+          @case ('exchange') { Nuevo exchange }
+          @case ('binding') { Nuevo binding }
+          @case ('publish') { Publicar mensaje de prueba }
+        }
+      </h3>
+      <button class="icon-btn" (click)="close()" aria-label="Cerrar"><app-icon name="x" /></button>
+    </div>
+    <div class="drawer-body form-grid">
+      @if (formError()) {
+        <div class="alert alert--error"><app-icon name="alert" /><div>{{ formError() }}</div></div>
+      }
+      @switch (p) {
+        @case ('queue') {
+          <div class="field"><label>Nombre</label>
+            <input class="input mono" placeholder="q.demo.alertas" [value]="qName()" (input)="qName.set(val($event))" />
+            <span class="hint">Letras, números, . _ : - · sin espacios · no puede empezar con amq.</span></div>
+          <label class="field" style="flex-direction:row;gap:8px;align-items:center">
+            <input type="checkbox" [checked]="qDurable()" (change)="qDurable.set(checked($event))" /> Durable (sobrevive a reinicios)</label>
+          <label class="field" style="flex-direction:row;gap:8px;align-items:center">
+            <input type="checkbox" [checked]="qDlq()" (change)="qDlq.set(checked($event))" /> Crear DLQ (&lt;nombre&gt;.dlq enlazada a cmd.dead.dlx)</label>
+          <div class="grid grid-2">
+            <div class="field"><label>TTL (ms, opcional)</label><input class="input" inputmode="numeric" [value]="qTtl()" (input)="qTtl.set(val($event))" /></div>
+            <div class="field"><label>Máx. mensajes (opcional)</label><input class="input" inputmode="numeric" [value]="qMax()" (input)="qMax.set(val($event))" /></div>
+          </div>
+        }
+        @case ('exchange') {
+          <div class="field"><label>Nombre</label>
+            <input class="input mono" placeholder="ex.demo" [value]="exName()" (input)="exName.set(val($event))" /></div>
+          <div class="field"><label>Tipo</label>
+            <div class="segmented">
+              @for (t of exchangeTypes; track t) { <button [class.on]="exType() === t" (click)="exType.set(t)">{{ t }}</button> }
+            </div>
+            <span class="hint">direct: clave exacta · topic: patrones con * y # · fanout: a todas las colas enlazadas</span></div>
+        }
+        @case ('binding') {
+          <div class="field"><label>Exchange</label>
+            <select class="select" [value]="bExchange()" (change)="bExchange.set(val($event))">
+              @for (e of exchanges(); track e.name) { <option [value]="e.name">{{ e.name }} ({{ e.type }})</option> }
+            </select></div>
+          <div class="field"><label>Cola</label>
+            <select class="select" [value]="bQueue()" (change)="bQueue.set(val($event))">
+              @for (q of queues() ?? []; track q.name) { <option [value]="q.name">{{ q.name }}</option> }
+            </select></div>
+          <div class="field"><label>Routing key / patrón</label>
+            <input class="input mono" placeholder="demo.alerta.*" [value]="bKey()" (input)="bKey.set(val($event))" />
+            <span class="hint">Los comodines * (una palabra) y # (cero o más) solo aplican a exchanges topic.</span></div>
+        }
+        @case ('publish') {
+          <div class="field"><label>Escenario</label>
+            <select class="select" [value]="pPreset()" (change)="applyPreset(val($event))">
+              @for (pr of presets; track pr.key) { <option [value]="pr.key">{{ pr.label }}</option> }
+            </select>
+            <span class="hint">{{ presetHint() }}</span></div>
+          <div class="grid grid-2">
+            <div class="field"><label>Exchange</label>
+              <select class="select" [value]="pExchange()" (change)="pExchange.set(val($event))">
+                @for (e of exchanges(); track e.name) { <option [value]="e.name">{{ e.name }}</option> }
+              </select></div>
+            <div class="field"><label>Routing key</label>
+              <input class="input mono" [value]="pKey()" (input)="pKey.set(val($event))" /></div>
+          </div>
+          <div class="field"><label>Cuerpo (envelope JSON)</label>
+            <textarea class="textarea mono" rows="14" style="font-size:12px" [value]="pBody()" (input)="pBody.set(val($event))"></textarea></div>
+          @if (lastPublish(); as r) {
+            <div class="alert" [class.alert--info]="r.routed" [class.alert--warn]="!r.routed">
+              <app-icon [name]="r.routed ? 'check' : 'alert'" />
+              <div><strong>{{ r.routed ? 'Enrutado' : 'Sin cola destino' }}</strong> · {{ r.note }}<br />
+                <span class="mono" style="font-size:12px">messageId {{ r.messageId }}</span></div>
+            </div>
+          }
+        }
+      }
+    </div>
+    <div class="drawer-foot">
+      <button class="btn btn--ghost" (click)="close()">Cerrar</button>
+      @switch (p) {
+        @case ('queue') { <button class="btn btn--primary" (click)="createQueue()" [disabled]="busy()">Crear cola</button> }
+        @case ('exchange') { <button class="btn btn--primary" (click)="createExchange()" [disabled]="busy()">Crear exchange</button> }
+        @case ('binding') { <button class="btn btn--primary" (click)="createBinding()" [disabled]="busy()">Crear binding</button> }
+        @case ('publish') { <button class="btn btn--primary" (click)="publish()" [disabled]="busy()"><app-icon name="send" [size]="16" /> Publicar</button> }
+      }
+    </div>
+  </aside>
+}
+
+@if (peekQueue(); as qn) {
+  <aside class="drawer" style="width:min(640px,100%)">
+    <div class="drawer-head">
+      <h3 class="mono">{{ qn }}</h3>
+      <button class="icon-btn" (click)="closePeek()" aria-label="Cerrar"><app-icon name="x" /></button>
+    </div>
+    <div class="drawer-body stack">
+      <p class="muted" style="margin:0;font-size:12.5px">Primeros 10 mensajes, leídos sin consumir (vuelven a la cola).</p>
+      @if (peeked() === null) {
+        @for (i of [1, 2]; track i) { <div class="skeleton sk-line"></div> }
+      } @else {
+        @for (m of peeked(); track $index) {
+          <div class="card card-pad" style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <span class="code-pill">{{ m.exchange || '(default)' }} · {{ m.routingKey }}</span>
+              @if (m.originalQueue) { <span class="chip">origen {{ m.originalQueue }}</span> }
+              @if (m.deathReason) { <span class="badge badge--danger">{{ m.deathReason }}</span> }
+              @if (m.retryCount) { <span class="chip chip--neutral">reintentos {{ m.retryCount }}</span> }
+            </div>
+            @if (m.lastError) { <div style="font-size:12.5px;color:var(--red)">{{ m.lastError }}</div> }
+            <pre class="mono" style="margin:0;font-size:11.5px;white-space:pre-wrap;word-break:break-word;max-height:220px;overflow:auto">{{ pretty(m.payload) }}</pre>
+          </div>
+        } @empty {
+          <div class="empty"><span class="empty-icon"><app-icon name="inbox" [size]="24" /></span><h4>Cola vacía</h4></div>
+        }
+      }
+    </div>
+  </aside>
+}

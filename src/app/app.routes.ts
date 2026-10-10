@@ -10,6 +10,7 @@ import { CatalogComponent } from './pages/catalog/catalog.component';
 import { ReportsComponent } from './pages/reports/reports.component';
 import { AuditComponent } from './pages/audit/audit.component';
 import { SessionComponent } from './pages/session/session.component';
+import { MessagingComponent } from './pages/messaging/messaging.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent, canActivate: [guestGuard], title: 'DigitalFix — Iniciar sesión' },
@@ -55,6 +56,13 @@ export const routes: Routes = [
     canActivate: [authGuard, roleGuard],
     title: 'DigitalFix — Auditoría',
     data: { roles: ['Admin', 'Auditor'], title: 'Auditoría' },
+  },
+  {
+    path: 'messaging',
+    component: MessagingComponent,
+    canActivate: [authGuard, roleGuard],
+    title: 'DigitalFix — Mensajería',
+    data: { roles: ['Admin'], title: 'Mensajería RabbitMQ' },
   },
   {
     path: 'session',

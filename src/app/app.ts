@@ -44,6 +44,7 @@ export class App implements OnInit, OnDestroy {
   readonly analytics: NavItem[] = [
     { path: '/reports', label: 'Reportería', icon: 'chart', roles: ['Admin'] },
     { path: '/audit', label: 'Auditoría', icon: 'history', roles: ['Admin', 'Auditor'] },
+    { path: '/messaging', label: 'Mensajería', icon: 'layers', roles: ['Admin'] },
   ];
   readonly security: NavItem[] = [{ path: '/session', label: 'Mi sesión y token', icon: 'key' }];
 
