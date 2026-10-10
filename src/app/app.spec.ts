@@ -1,24 +1,26 @@
-import { TestBed } from '@angular/core/testing';
-import { App } from './app';
+import { routes } from './app.routes';
+import { authGuard } from './core/guards/auth.guard';
+import { roleGuard } from './core/guards/role.guard';
 
-describe('App', () => {
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [App],
-    })
-      .compileComponents();
+/** Contrato de navegación: rutas privadas protegidas y roles por pantalla. */
+describe('Rutas de la aplicación', () => {
+  const byPath = (path: string) => routes.find((r) => r.path === path);
+
+  it('Mensajería solo es accesible para el rol Admin', () => {
+    const r = byPath('messaging');
+    expect(r?.canActivate).toEqual([authGuard, roleGuard]);
+    expect(r?.data?.['roles']).toEqual(['Admin']);
   });
 
-  it('should create the app', () => {
-    const fixture = TestBed.createComponent(App);
-    const app = fixture.componentInstance;
-    expect(app).toBeTruthy();
+  it('toda ruta con componente, excepto login, exige sesión', () => {
+    const privadas = routes.filter((r) => r.component && r.path !== 'login');
+    expect(privadas.length).toBeGreaterThan(5);
+    for (const r of privadas) {
+      expect(r.canActivate ?? []).toContain(authGuard);
+    }
   });
 
-  it('should render title', async () => {
-    const fixture = TestBed.createComponent(App);
-    await fixture.whenStable();
-    const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, frontend-digitalfix');
+  it('las rutas desconocidas vuelven al dashboard', () => {
+    expect(byPath('**')?.redirectTo).toBe('dashboard');
   });
 });

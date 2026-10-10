@@ -1,59 +1,56 @@
-# FrontendDigitalfix
+# frontend-digitalfix
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.1.7.
+[![CI](https://github.com/DigitalFix-Grupo12/frontend-digitalfix/actions/workflows/ci.yml/badge.svg)](https://github.com/DigitalFix-Grupo12/frontend-digitalfix/actions/workflows/ci.yml)
 
-## Development server
+SPA Angular 22 (standalone, zoneless) de DigitalFix. Login corporativo con **Microsoft Entra ID**
+mediante **MSAL** (OAuth 2.0 / OpenID Connect, Authorization Code + PKCE) y consumo del backend a través de
+**AWS API Gateway** → `ms-digitalfix-bff`. El `MsalInterceptor` adjunta el access token (JWT) a cada llamada.
 
-To start a local development server, run:
+Publicado en AWS Amplify: https://main.dehlzhnwtqj7a.amplifyapp.com
 
-```bash
-ng serve
+## Pantallas y roles
+
+| Ruta | Pantalla | Roles |
+|---|---|---|
+| `/login` | Inicio de sesión con Microsoft | público |
+| `/dashboard` | Resumen según rol | autenticados |
+| `/workorders`, `/workorders/:id` | Órdenes de trabajo (tablero por estado, detalle con historial) | Admin, Supervisor, Cliente |
+| `/catalog` | Catálogo técnico | Admin, Supervisor |
+| `/reports` | KPIs | Admin |
+| `/audit` | Timeline de auditoría | Admin, Auditor |
+| `/messaging` | **Mensajería RabbitMQ**: clúster, colas y DLQ, exchanges, bindings, publicación de prueba y reproceso | Admin |
+| `/session` | Claims del token y probador de rutas 200/401/403 | autenticados |
+
+Las rutas privadas usan `authGuard` (sesión MSAL) y `roleGuard` (App Roles del claim `roles`).
+El backend vuelve a validar el rol: ocultar un menú no es el control de seguridad.
+
+## Estructura
+
+```
+src/app/
+├── core/
+│   ├── config/      app-config.ts (tenant, clientId, scope, URL del gateway) · msal.factories.ts
+│   ├── guards/      authGuard · roleGuard
+│   ├── services/    auth · api · workorders · rabbit-admin · toast
+│   ├── components/  toast-tray
+│   └── ui/          icon (SVG inline) · format (fechas, estados, errores)
+└── pages/           login · dashboard · workorders · workorder-detail · catalog · reports · audit · messaging · session
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+## Desarrollo
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+Requisitos: Node 22.22+ o 24, Angular CLI 22.
 
 ```bash
-ng generate component component-name
+npm ci
+ng serve          # http://localhost:4200 (registrado como Redirect URI en Entra ID)
+ng build          # build de producción en dist/
+ng test           # tests unitarios con Vitest
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+`app-config.ts` apunta al API Gateway de AWS. Para probar contra un BFF local, cambiar `api.baseUrl` a
+`http://localhost:8080`.
 
-```bash
-ng generate --help
-```
+## Despliegue
 
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+`digitalfix-infra/scripts/Deploy-Frontend.ps1`: `ng build` + publicación en AWS Amplify con rewrite SPA.
