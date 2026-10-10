@@ -144,6 +144,7 @@ export class MessagingComponent implements OnInit, OnDestroy {
   mainQueues = computed(() => (this.queues() ?? []).filter((q) => !q.deadLetterQueue));
   dlqs = computed(() => (this.queues() ?? []).filter((q) => q.deadLetterQueue));
   dlqTotal = computed(() => this.dlqs().reduce((n, q) => n + q.messagesReady, 0));
+  pendingMain = computed(() => this.mainQueues().reduce((n, q) => n + q.messagesReady, 0));
   runningNodes = computed(() => (this.overview()?.nodes ?? []).filter((n) => n.running).length);
   bindingsByQueue = computed(() => {
     const map = new Map<string, BindingInfo[]>();

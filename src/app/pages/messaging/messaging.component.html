@@ -30,8 +30,8 @@
   </div>
   <div class="card kpi">
     <div class="kpi-top"><span class="kpi-label">Mensajes pendientes</span><span class="kpi-icon kpi-icon--amber"><app-icon name="inbox" /></span></div>
-    <div class="kpi-value">{{ overview()?.messagesReady ?? 0 }}</div>
-    <div class="kpi-sub">{{ overview()?.messagesUnacked ?? 0 }} sin ACK (en proceso)</div>
+    <div class="kpi-value">{{ pendingMain() }}</div>
+    <div class="kpi-sub">{{ overview()?.messagesUnacked ?? 0 }} sin ACK (en proceso) · sin contar DLQ</div>
   </div>
   <div class="card kpi">
     <div class="kpi-top"><span class="kpi-label">En DLQ</span><span class="kpi-icon kpi-icon--violet"><app-icon name="alert" /></span></div>
@@ -212,11 +212,11 @@
         @case ('binding') {
           <div class="field"><label>Exchange</label>
             <select class="select" [value]="bExchange()" (change)="bExchange.set(val($event))">
-              @for (e of exchanges(); track e.name) { <option [value]="e.name">{{ e.name }} ({{ e.type }})</option> }
+              @for (e of exchanges(); track e.name) { <option [value]="e.name" [selected]="e.name === bExchange()">{{ e.name }} ({{ e.type }})</option> }
             </select></div>
           <div class="field"><label>Cola</label>
             <select class="select" [value]="bQueue()" (change)="bQueue.set(val($event))">
-              @for (q of queues() ?? []; track q.name) { <option [value]="q.name">{{ q.name }}</option> }
+              @for (q of queues() ?? []; track q.name) { <option [value]="q.name" [selected]="q.name === bQueue()">{{ q.name }}</option> }
             </select></div>
           <div class="field"><label>Routing key / patrón</label>
             <input class="input mono" placeholder="demo.alerta.*" [value]="bKey()" (input)="bKey.set(val($event))" />
@@ -225,13 +225,13 @@
         @case ('publish') {
           <div class="field"><label>Escenario</label>
             <select class="select" [value]="pPreset()" (change)="applyPreset(val($event))">
-              @for (pr of presets; track pr.key) { <option [value]="pr.key">{{ pr.label }}</option> }
+              @for (pr of presets; track pr.key) { <option [value]="pr.key" [selected]="pr.key === pPreset()">{{ pr.label }}</option> }
             </select>
             <span class="hint">{{ presetHint() }}</span></div>
           <div class="grid grid-2">
             <div class="field"><label>Exchange</label>
               <select class="select" [value]="pExchange()" (change)="pExchange.set(val($event))">
-                @for (e of exchanges(); track e.name) { <option [value]="e.name">{{ e.name }}</option> }
+                @for (e of exchanges(); track e.name) { <option [value]="e.name" [selected]="e.name === pExchange()">{{ e.name }}</option> }
               </select></div>
             <div class="field"><label>Routing key</label>
               <input class="input mono" [value]="pKey()" (input)="pKey.set(val($event))" /></div>
