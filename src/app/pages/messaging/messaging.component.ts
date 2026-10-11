@@ -13,6 +13,7 @@ import {
 } from '../../core/services/rabbit-admin.service';
 import { ToastService } from '../../core/services/toast.service';
 import { IconComponent } from '../../core/ui/icon.component';
+import { activeTenant } from '../../core/config/app-config';
 
 type Panel = 'queue' | 'exchange' | 'binding' | 'publish' | null;
 
@@ -25,7 +26,7 @@ interface Preset {
   body: () => string;
 }
 
-const DEMO_TO = 'cliente.demo@tenatkevin.onmicrosoft.com';
+const DEMO_TO = `cliente.demo@${activeTenant.domain}`;
 
 function envelope(type: string, payload: object, simulateFailure?: string): string {
   const env: Record<string, unknown> = {

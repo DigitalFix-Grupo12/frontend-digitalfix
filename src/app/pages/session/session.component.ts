@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { IconComponent } from '../../core/ui/icon.component';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
-import { appConfig } from '../../core/config/app-config';
+import { activeTenant, appConfig } from '../../core/config/app-config';
 import { AuthService, JwtClaims } from '../../core/services/auth.service';
 import { ToastService } from '../../core/services/toast.service';
 
@@ -35,6 +35,7 @@ export class SessionComponent implements OnInit, OnDestroy {
   authService = inject(AuthService);
 
   readonly config = appConfig;
+  readonly tenant = activeTenant;
   readonly authority = `https://login.microsoftonline.com/${appConfig.azureAd.tenantId}/v2.0`;
 
   accessToken = signal<string | null>(null);

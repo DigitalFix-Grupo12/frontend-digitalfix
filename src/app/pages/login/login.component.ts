@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { AuthService } from '../../core/services/auth.service';
 import { IconComponent } from '../../core/ui/icon.component';
+import { activeTenant, saveTenantKey, tenantProfiles } from '../../core/config/app-config';
 
 @Component({
   selector: 'app-login',
@@ -10,6 +11,16 @@ import { IconComponent } from '../../core/ui/icon.component';
 })
 export class LoginComponent {
   authService = inject(AuthService);
+
+  readonly tenants = tenantProfiles;
+  readonly activeTenant = activeTenant;
+
+  /** MSAL se inicializa con el tenant elegido al arrancar: cambiarlo recarga la app. */
+  selectTenant(key: string): void {
+    if (key === this.activeTenant.key) return;
+    saveTenantKey(key);
+    window.location.reload();
+  }
 
   readonly features = [
     { icon: 'wrench', tone: 'amber', title: 'Órdenes en terreno', text: 'Ciclo completo: creación, asignación, ejecución y cierre.' },

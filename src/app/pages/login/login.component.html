@@ -39,7 +39,18 @@
   <section class="auth-panel">
     <div class="card auth-card fade-in">
       <h2>Bienvenido</h2>
-      <p>Inicia sesión con tu cuenta corporativa para continuar.</p>
+      <p>Elige el tenant de tu organización e inicia sesión con tu cuenta.</p>
+
+      @if (tenants.length > 1) {
+        <div class="segmented" role="radiogroup" aria-label="Tenant de Microsoft Entra ID" style="margin-bottom:16px;">
+          @for (t of tenants; track t.key) {
+            <button type="button" role="radio" [attr.aria-checked]="t.key === activeTenant.key"
+                    [class.on]="t.key === activeTenant.key" (click)="selectTenant(t.key)">
+              {{ t.label }}
+            </button>
+          }
+        </div>
+      }
 
       <button class="btn btn--primary btn--lg btn--block" (click)="authService.login()">
         <span class="ms-logo" aria-hidden="true">
@@ -49,9 +60,8 @@
         Iniciar sesión con Microsoft
       </button>
 
-      <p class="faint" style="font-size:12.5px;margin:14px 0 0;">
-        ¿No tienes cuenta? Presiona el botón, escribe tu correo y Microsoft te guiará para
-        <strong class="muted">crear tu cuenta</strong> con un código de verificación.
+      <p class="faint mono" style="font-size:12px;margin:14px 0 0;">
+        {{ activeTenant.label }} · {{ activeTenant.domain }}
       </p>
 
       <div class="divider">Conexión segura</div>

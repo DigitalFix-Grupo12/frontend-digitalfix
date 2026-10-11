@@ -54,6 +54,7 @@
     }
   </div>
   <dl class="kv" style="margin:0;border-top:1px solid var(--line-soft)">
+    <div><dt>Tenant</dt><dd class="mono" style="font-size:12px">{{ tenant.label }} · {{ tenant.domain }}</dd></div>
     <div><dt>Authority (IDaaS)</dt><dd class="mono" style="font-size:12px">{{ authority }}</dd></div>
     <div><dt>Client ID (SPA)</dt><dd class="mono" style="font-size:12px">{{ config.azureAd.clientId }}</dd></div>
     <div><dt>Scope solicitado</dt><dd class="mono" style="font-size:12px">{{ config.api.scope }}</dd></div>
