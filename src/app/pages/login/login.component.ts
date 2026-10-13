@@ -2,6 +2,7 @@ import { Component, inject } from '@angular/core';
 import { AuthService } from '../../core/services/auth.service';
 import { IconComponent } from '../../core/ui/icon.component';
 import { activeTenant, saveTenantKey, tenantProfiles } from '../../core/config/app-config';
+import { ThemeService } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-login',
@@ -11,6 +12,7 @@ import { activeTenant, saveTenantKey, tenantProfiles } from '../../core/config/a
 })
 export class LoginComponent {
   authService = inject(AuthService);
+  theme = inject(ThemeService);
 
   readonly tenants = tenantProfiles;
   readonly activeTenant = activeTenant;
@@ -26,6 +28,6 @@ export class LoginComponent {
     { icon: 'wrench', tone: 'amber', title: 'Órdenes en terreno', text: 'Ciclo completo: creación, asignación, ejecución y cierre.' },
     { icon: 'shield', tone: 'green', title: 'Acceso por roles', text: 'Admin, Supervisor, Cliente y Auditor con Entra ID.' },
     { icon: 'chart', tone: 'blue', title: 'KPIs de la red', text: 'Tiempos de resolución y carga por franja horaria.' },
-    { icon: 'history', tone: 'violet', title: 'Trazabilidad', text: 'Cada cambio queda auditado con su responsable.' },
+    { icon: 'layers', tone: 'violet', title: 'Mensajería asíncrona', text: 'RabbitMQ en clúster con reintentos y DLQ.' },
   ];
 }

@@ -84,3 +84,13 @@ export function httpErrorMessage(err: { status?: number; error?: unknown; messag
       return msg || `Error inesperado (HTTP ${err.status}).`;
   }
 }
+
+/** "ESTADO_EN_EJECUCION" -> "Pasó a En ejecución"; "ORDEN_CREADA" -> "Orden creada". */
+export function humanAction(accion: string): string {
+  if (accion.startsWith('ESTADO_')) {
+    const s = accion.slice('ESTADO_'.length) as WorkOrderStatus;
+    return `Pasó a ${STATUS_META[s]?.label ?? s.toLowerCase().replace(/_/g, ' ')}`;
+  }
+  const txt = accion.toLowerCase().replace(/_/g, ' ');
+  return txt.charAt(0).toUpperCase() + txt.slice(1);
+}

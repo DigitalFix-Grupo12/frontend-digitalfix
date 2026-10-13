@@ -9,6 +9,9 @@ import { ApiService } from './core/services/api.service';
 import { ToastTrayComponent } from './core/components/toast/toast-tray.component';
 import { IconComponent } from './core/ui/icon.component';
 import { initials } from './core/ui/format';
+import { ConfirmDialogComponent } from './core/components/confirm/confirm-dialog.component';
+import { ThemeService } from './core/services/theme.service';
+import { activeTenant } from './core/config/app-config';
 
 interface NavItem {
   path: string;
@@ -20,7 +23,7 @@ interface NavItem {
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastTrayComponent, IconComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, ToastTrayComponent, ConfirmDialogComponent, IconComponent],
   templateUrl: './app.html',
 })
 export class App implements OnInit, OnDestroy {
@@ -29,12 +32,15 @@ export class App implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   authService = inject(AuthService);
   api = inject(ApiService);
+  theme = inject(ThemeService);
+  readonly tenant = activeTenant;
 
   private destroy$ = new Subject<void>();
   private healthTimer?: ReturnType<typeof setInterval>;
 
   pageTitle = signal('Dashboard');
   menuOpen = signal(false);
+  compact = signal(App.storedCompact());
 
   readonly operations: NavItem[] = [
     { path: '/dashboard', label: 'Dashboard', icon: 'grid' },
@@ -49,6 +55,13 @@ export class App implements OnInit, OnDestroy {
   readonly security: NavItem[] = [{ path: '/session', label: 'Mi sesión y token', icon: 'key' }];
 
   visibleAnalytics = computed(() => this.analytics.filter((i) => this.canSee(i)));
+  groups = computed(() =>
+    [
+      { label: 'Operación', items: this.operations.filter((i) => this.canSee(i)) },
+      { label: 'Análisis y plataforma', items: this.visibleAnalytics() },
+      { label: 'Seguridad', items: this.security },
+    ].filter((g) => g.items.length > 0)
+  );
   userInitials = computed(() => initials(this.authService.getDisplayName() || '?'));
 
   ngOnInit(): void {
@@ -85,6 +98,23 @@ export class App implements OnInit, OnDestroy {
 
   canSee(item: NavItem): boolean {
     return !item.roles || this.authService.hasRole(...item.roles);
+  }
+
+  toggleCompact(): void {
+    this.compact.update((v) => !v);
+    try {
+      localStorage.setItem('digitalfix.sidebar', this.compact() ? 'compact' : 'full');
+    } catch {
+      /* sin almacenamiento */
+    }
+  }
+
+  private static storedCompact(): boolean {
+    try {
+      return localStorage.getItem('digitalfix.sidebar') === 'compact';
+    } catch {
+      return false;
+    }
   }
 
   logout(): void {

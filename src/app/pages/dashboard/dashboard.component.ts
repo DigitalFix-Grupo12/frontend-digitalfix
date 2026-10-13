@@ -4,7 +4,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { ApiService, AuditEvent, Kpis } from '../../core/services/api.service';
 import { WorkOrder, WorkOrderStatus, WorkordersService } from '../../core/services/workorders.service';
 import { IconComponent } from '../../core/ui/icon.component';
-import { STATUS_META, badgeClass, statusLabel, timeAgo } from '../../core/ui/format';
+import { STATUS_META, badgeClass, humanAction, initials, statusLabel, timeAgo } from '../../core/ui/format';
 
 const TONE_COLOR: Record<string, string> = {
   open: 'var(--blue)',
@@ -29,6 +29,8 @@ export class DashboardComponent implements OnInit {
   readonly badgeClass = badgeClass;
   readonly statusLabel = statusLabel;
   readonly timeAgo = timeAgo;
+  readonly humanAction = humanAction;
+  readonly initials = initials;
 
   orders = signal<WorkOrder[] | null>(null);
   kpis = signal<Kpis | null>(null);

@@ -1,49 +1,30 @@
 @if (authService.isLoggedIn()) {
-  <div class="shell">
-    <aside class="sidebar" [class.open]="menuOpen()">
-      <div class="brand">
-        <span class="brand-mark"><app-icon name="bolt" [size]="20" /></span>
+  <div class="shell" [class.compact]="compact()">
+    <aside class="sidebar" [class.open]="menuOpen()" aria-label="Navegación principal">
+      <a class="brand" routerLink="/dashboard" title="DigitalFix">
+        <span class="brand-mark"><app-icon name="bolt" [size]="18" /></span>
         <div>
           <div class="brand-name">DigitalFix</div>
-          <div class="brand-sub">Mantención eléctrica en terreno</div>
+          <div class="brand-sub">Mantención eléctrica</div>
         </div>
-      </div>
+      </a>
 
-      <div class="nav-label">Operación</div>
-      <nav class="nav">
-        @for (item of operations; track item.path) {
-          @if (canSee(item)) {
-            <a [routerLink]="item.path" routerLinkActive="active">
-              <app-icon [name]="item.icon" />{{ item.label }}
-            </a>
-          }
-        }
-      </nav>
-
-      @if (visibleAnalytics().length) {
-        <div class="nav-label">Análisis</div>
+      @for (group of groups(); track group.label; let first = $first) {
+        @if (!first) { <div class="nav-sep"></div> }
+        <div class="nav-label">{{ group.label }}</div>
         <nav class="nav">
-          @for (item of visibleAnalytics(); track item.path) {
-            <a [routerLink]="item.path" routerLinkActive="active">
-              <app-icon [name]="item.icon" />{{ item.label }}
+          @for (item of group.items; track item.path) {
+            <a [routerLink]="item.path" routerLinkActive="active" [attr.title]="compact() ? item.label : null">
+              <app-icon [name]="item.icon" /><span class="nav-text">{{ item.label }}</span>
             </a>
           }
         </nav>
       }
 
-      <div class="nav-label">Seguridad</div>
-      <nav class="nav">
-        @for (item of security; track item.path) {
-          <a [routerLink]="item.path" routerLinkActive="active">
-            <app-icon [name]="item.icon" />{{ item.label }}
-          </a>
-        }
-      </nav>
-
       <div class="nav-spacer"></div>
 
       <div class="user-card">
-        <span class="avatar">{{ userInitials() }}</span>
+        <span class="avatar" [title]="authService.getDisplayName()">{{ userInitials() }}</span>
         <div class="who">
           <div class="name" [title]="authService.getDisplayName()">{{ authService.getDisplayName() }}</div>
           <div class="roles">
@@ -55,13 +36,13 @@
           </div>
         </div>
         <button class="icon-btn" (click)="logout()" title="Cerrar sesión" aria-label="Cerrar sesión">
-          <app-icon name="logout" />
+          <app-icon name="logout" [size]="17" />
         </button>
       </div>
     </aside>
 
     @if (menuOpen()) {
-      <div class="backdrop" (click)="menuOpen.set(false)"></div>
+      <div class="backdrop" style="z-index:35" (click)="menuOpen.set(false)"></div>
     }
 
     <div class="main">
@@ -69,22 +50,35 @@
         <button class="icon-btn menu-btn" (click)="menuOpen.set(true)" aria-label="Abrir menú">
           <app-icon name="menu" />
         </button>
+        <button class="icon-btn collapse-btn" (click)="toggleCompact()"
+                [attr.aria-label]="compact() ? 'Expandir menú' : 'Contraer menú'" [title]="compact() ? 'Expandir menú' : 'Contraer menú'">
+          <app-icon name="sidebar" [size]="17" />
+        </button>
         <div class="crumbs">
-          <span>DigitalFix</span>
-          <app-icon name="chevron" [size]="14" />
+          <span class="faint">DigitalFix</span>
+          <app-icon name="chevron" [size]="13" />
           <strong>{{ pageTitle() }}</strong>
         </div>
         <div class="grow"></div>
+        <span class="env-chip tenant-chip" [title]="'Microsoft Entra ID · ' + tenant.domain">
+          <app-icon name="building" [size]="14" />
+          <span class="env-text"><strong>{{ tenant.label }}</strong></span>
+        </span>
         <span class="env-chip" [title]="'API Gateway: ' + (api.backendOnline() ? 'operativo' : 'sin respuesta')">
           <span class="dot"
                 [class.dot--on]="api.backendOnline() === true"
+                [class.dot--pulse]="api.backendOnline() === true"
                 [class.dot--off]="api.backendOnline() === false"></span>
-          <span class="env-text">AWS · us-east-1 ·
-            {{ api.backendOnline() === null ? 'verificando' : api.backendOnline() ? 'en línea' : 'sin conexión' }}</span>
+          <span class="env-text">AWS · {{ api.backendOnline() === null ? 'verificando' : api.backendOnline() ? 'en línea' : 'sin conexión' }}</span>
         </span>
+        <button class="icon-btn" (click)="theme.toggle()"
+                [attr.aria-label]="theme.theme() === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
+                [title]="theme.theme() === 'dark' ? 'Tema claro' : 'Tema oscuro'">
+          <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" [size]="17" />
+        </button>
       </header>
 
-      <main class="content">
+      <main class="content" id="contenido">
         <router-outlet />
       </main>
     </div>
@@ -94,3 +88,4 @@
 }
 
 <app-toast-tray />
+<app-confirm-dialog />

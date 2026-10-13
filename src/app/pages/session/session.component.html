@@ -68,25 +68,25 @@
     <span class="faint" style="font-size:12px">200 permitido · 401 sin token · 403 rol insuficiente</span>
   </div>
   <div class="table-wrap">
-    <table class="table">
+    <table class="table table--stack">
       <thead>
         <tr><th>Ruta</th><th>Roles permitidos</th><th>Con token</th><th>Sin token</th><th>Respuesta</th></tr>
       </thead>
       <tbody>
         @for (p of probes(); track p.path) {
           <tr>
-            <td><span class="code-pill">{{ p.method }}</span> <span class="mono" style="font-size:12.5px">{{ p.path }}</span></td>
-            <td>{{ p.roles }}</td>
-            <td>
+            <td class="cell-main"><span class="code-pill">{{ p.method }}</span> <span class="mono" style="font-size:12.5px">{{ p.path }}</span></td>
+            <td data-label="Roles">{{ p.roles }}</td>
+            <td data-label="Con token">
               @if (p.withToken !== undefined) { <span [class]="statusClass(p.withToken)">{{ p.withToken }}</span> }
               @else if (p.running) { <span class="faint">…</span> }
               @else { <span class="faint">—</span> }
             </td>
-            <td>
+            <td data-label="Sin token">
               @if (p.withoutToken !== undefined) { <span [class]="statusClass(p.withoutToken)">{{ p.withoutToken }}</span> }
               @else { <span class="faint">—</span> }
             </td>
-            <td class="mono faint" style="font-size:12px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.body }}</td>
+            <td data-label="Respuesta" class="mono faint" style="font-size:12px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ p.body }}</td>
           </tr>
         }
       </tbody>

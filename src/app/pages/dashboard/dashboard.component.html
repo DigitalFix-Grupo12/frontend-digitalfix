@@ -113,7 +113,7 @@
               <div class="bar-seg" [style.width.%]="d.pct" [style.background]="d.color" [title]="d.label + ': ' + d.n"></div>
             }
           </div>
-          <ul class="legend mt">
+          <ul class="legend" style="margin-top:18px">
             @for (d of distribution(); track d.status) {
               <li><span class="sw" [style.background]="d.color"></span>{{ d.label }}<span class="v">{{ d.n }}</span></li>
             } @empty {
@@ -154,9 +154,9 @@
     <ul class="list">
       @for (e of ev; track e.id) {
         <li class="list-row">
-          <span class="avatar avatar--sm">{{ e.usuario.slice(0, 2).toUpperCase() }}</span>
+          <span class="avatar avatar--sm">{{ initials(e.usuario.split('@')[0]) }}</span>
           <div class="main-col">
-            <div class="t">{{ e.accion }}</div>
+            <div class="t">{{ humanAction(e.accion) }}</div>
             <div class="s">{{ e.usuario }} · {{ timeAgo(e.fecha) }}</div>
           </div>
           @if (e.referencia) { <span class="code-pill">{{ e.referencia }}</span> }

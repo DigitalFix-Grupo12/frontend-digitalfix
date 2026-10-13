@@ -1,7 +1,7 @@
 <div class="auth">
   <section class="auth-hero">
-    <div class="brand">
-      <span class="brand-mark"><app-icon name="bolt" [size]="20" /></span>
+    <div class="brand" style="padding:0">
+      <span class="brand-mark"><app-icon name="bolt" [size]="18" /></span>
       <div>
         <div class="brand-name">DigitalFix</div>
         <div class="brand-sub">Mantención eléctrica en terreno</div>
@@ -12,14 +12,14 @@
       <div class="eyebrow"><app-icon name="cloud" [size]="14" /> Plataforma cloud native</div>
       <h1>Cada falla eléctrica, <em>resuelta y trazada</em> de punta a punta.</h1>
       <p class="lead">
-        Coordina a supervisores, técnicos y clientes en una sola plataforma segura,
-        desplegada en AWS y protegida con Microsoft Entra ID.
+        Supervisores, técnicos y clientes en una sola plataforma segura, desplegada en AWS
+        y protegida con Microsoft Entra ID.
       </p>
 
       <div class="features">
         @for (f of features; track f.title) {
           <div class="feature">
-            <span class="kpi-icon kpi-icon--{{ f.tone }}"><app-icon [name]="f.icon" /></span>
+            <span class="kpi-icon kpi-icon--{{ f.tone }}"><app-icon [name]="f.icon" [size]="16" /></span>
             <div>
               <strong>{{ f.title }}</strong>
               <span>{{ f.text }}</span>
@@ -32,23 +32,44 @@
     <div class="auth-foot">
       <span>Angular + MSAL</span>
       <span>AWS API Gateway</span>
-      <span>Spring Boot · Amazon RDS</span>
+      <span>Spring Boot</span>
+      <span>RabbitMQ</span>
     </div>
   </section>
 
   <section class="auth-panel">
+    <button class="icon-btn theme-fab" (click)="theme.toggle()"
+            [attr.aria-label]="theme.theme() === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'">
+      <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" [size]="17" />
+    </button>
+
     <div class="card auth-card fade-in">
-      <h2>Bienvenido</h2>
-      <p>Elige el tenant de tu organización e inicia sesión con tu cuenta.</p>
+      <h2>Iniciar sesión</h2>
+      <p>{{ tenants.length > 1 ? 'Elige la organización (tenant) y entra con tu cuenta Microsoft.' : 'Entra con tu cuenta Microsoft de la organización.' }}</p>
 
       @if (tenants.length > 1) {
-        <div class="segmented" role="radiogroup" aria-label="Tenant de Microsoft Entra ID" style="margin-bottom:16px;">
+        <div class="tenant-pick" role="radiogroup" aria-label="Tenant de Microsoft Entra ID">
           @for (t of tenants; track t.key) {
-            <button type="button" role="radio" [attr.aria-checked]="t.key === activeTenant.key"
+            <button type="button" class="tenant-opt" role="radio" [attr.aria-checked]="t.key === activeTenant.key"
                     [class.on]="t.key === activeTenant.key" (click)="selectTenant(t.key)">
-              {{ t.label }}
+              <span class="kpi-icon kpi-icon--blue" style="width:32px;height:32px"><app-icon name="building" [size]="16" /></span>
+              <span style="min-width:0">
+                <span class="t">{{ t.label }}</span>
+                <span class="s">{{ t.domain }}</span>
+              </span>
+              <span class="radio" aria-hidden="true"></span>
             </button>
           }
+        </div>
+      } @else {
+        <div class="tenant-pick">
+          <div class="tenant-opt on" style="cursor:default">
+            <span class="kpi-icon kpi-icon--blue" style="width:32px;height:32px"><app-icon name="building" [size]="16" /></span>
+            <span style="min-width:0">
+              <span class="t">{{ activeTenant.label }}</span>
+              <span class="s">{{ activeTenant.domain }}</span>
+            </span>
+          </div>
         </div>
       }
 
@@ -57,17 +78,13 @@
           <i style="background:#f25022"></i><i style="background:#7fba00"></i>
           <i style="background:#00a4ef"></i><i style="background:#ffb900"></i>
         </span>
-        Iniciar sesión con Microsoft
+        Continuar con Microsoft
       </button>
-
-      <p class="faint mono" style="font-size:12px;margin:14px 0 0;">
-        {{ activeTenant.label }} · {{ activeTenant.domain }}
-      </p>
 
       <div class="divider">Conexión segura</div>
       <ul class="trust">
-        <li><app-icon name="check" [size]="16" /> OAuth 2.0 / OpenID Connect con Authorization Code + PKCE</li>
-        <li><app-icon name="check" [size]="16" /> Token JWT validado en el API Gateway y en el backend</li>
+        <li><app-icon name="check" [size]="16" /> OAuth 2.0 / OpenID Connect · Authorization Code + PKCE</li>
+        <li><app-icon name="check" [size]="16" /> JWT validado en el API Gateway y en el backend</li>
         <li><app-icon name="check" [size]="16" /> Permisos por rol definidos en Microsoft Entra ID</li>
       </ul>
     </div>

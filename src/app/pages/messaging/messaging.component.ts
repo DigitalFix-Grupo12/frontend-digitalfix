@@ -12,14 +12,18 @@ import {
   problemMessage,
 } from '../../core/services/rabbit-admin.service';
 import { ToastService } from '../../core/services/toast.service';
+import { ConfirmService } from '../../core/services/confirm.service';
 import { IconComponent } from '../../core/ui/icon.component';
 import { activeTenant } from '../../core/config/app-config';
 
 type Panel = 'queue' | 'exchange' | 'binding' | 'publish' | null;
+type Tab = 'queues' | 'exchanges' | 'bindings';
 
 interface Preset {
   key: string;
   label: string;
+  /** resultado esperado en el consumidor: ack, retry o dlq */
+  outcome: 'ack' | 'retry' | 'dlq';
   hint: string;
   exchange: string;
   routingKey: string;
@@ -54,36 +58,36 @@ const emailPayload = (to = DEMO_TO) => ({
 /** Mensajes de prueba: cada uno demuestra una ruta del consumidor (ACK, reintento, DLQ). */
 const PRESETS: Preset[] = [
   {
-    key: 'email-ok', label: 'Email OK (topic)', hint: 'cmd.topic · email.enroute → q.cmd.email → ACK',
+    key: 'email-ok', outcome: 'ack', label: 'Email OK (topic)', hint: 'cmd.topic · email.enroute → q.cmd.email → ACK',
     exchange: 'cmd.topic', routingKey: 'email.enroute', body: () => envelope('EMAIL', emailPayload()),
   },
   {
-    key: 'email-direct', label: 'Email OK (direct)', hint: 'cmd.direct · email.send → q.cmd.email → ACK',
+    key: 'email-direct', outcome: 'ack', label: 'Email OK (direct)', hint: 'cmd.direct · email.send → q.cmd.email → ACK',
     exchange: 'cmd.direct', routingKey: 'email.send', body: () => envelope('EMAIL', emailPayload()),
   },
   {
-    key: 'transient-once', label: 'Falla 1 vez y se recupera', hint: '1er intento falla → reintento con x-retry-count → ACK',
+    key: 'transient-once', outcome: 'retry', label: 'Falla 1 vez y se recupera', hint: '1er intento falla → reintento con x-retry-count → ACK',
     exchange: 'cmd.topic', routingKey: 'email.enroute', body: () => envelope('EMAIL', emailPayload(), 'TRANSIENT_ONCE'),
   },
   {
-    key: 'transient', label: 'Falla transitoria persistente', hint: '3 intentos con espera creciente → NACK → q.cmd.email.dlq',
+    key: 'transient', outcome: 'dlq', label: 'Falla transitoria persistente', hint: '3 intentos con espera creciente → NACK → q.cmd.email.dlq',
     exchange: 'cmd.topic', routingKey: 'email.enroute', body: () => envelope('EMAIL', emailPayload(), 'TRANSIENT'),
   },
   {
-    key: 'invalid-email', label: 'Destinatario inválido', hint: 'validación del payload → NACK inmediato → DLQ',
+    key: 'invalid-email', outcome: 'dlq', label: 'Destinatario inválido', hint: 'validación del payload → NACK inmediato → DLQ',
     exchange: 'cmd.direct', routingKey: 'email.send', body: () => envelope('EMAIL', emailPayload('no-es-un-email')),
   },
   {
-    key: 'bad-json', label: 'JSON mal formado', hint: 'no se puede leer → NACK inmediato → DLQ',
+    key: 'bad-json', outcome: 'dlq', label: 'JSON mal formado', hint: 'no se puede leer → NACK inmediato → DLQ',
     exchange: 'cmd.direct', routingKey: 'email.send', body: () => '{ "type": "EMAIL", esto no es json',
   },
   {
-    key: 'dispatch', label: 'Ticket de despacho', hint: 'cmd.direct · dispatch.ticket → q.cmd.dispatch',
+    key: 'dispatch', outcome: 'ack', label: 'Ticket de despacho', hint: 'cmd.direct · dispatch.ticket → q.cmd.dispatch',
     exchange: 'cmd.direct', routingKey: 'dispatch.ticket',
     body: () => envelope('DISPATCH_TICKET', { orderId: 99, tecnicoId: 'tecnico.demo', clienteId: DEMO_TO, descripcion: 'Revisión de tablero' }),
   },
   {
-    key: 'report', label: 'Certificado PDF', hint: 'cmd.direct · report.gen → q.cmd.report → PDF',
+    key: 'report', outcome: 'ack', label: 'Certificado PDF', hint: 'cmd.direct · report.gen → q.cmd.report → PDF',
     exchange: 'cmd.direct', routingKey: 'report.gen',
     body: () => {
       const closed = new Date();
@@ -101,11 +105,14 @@ const PRESETS: Preset[] = [
   standalone: true,
   imports: [IconComponent],
   templateUrl: './messaging.component.html',
+  host: { '(document:keydown.escape)': 'onEscape()' },
 })
 export class MessagingComponent implements OnInit, OnDestroy {
   private rabbit = inject(RabbitAdminService);
   private toast = inject(ToastService);
+  private confirm = inject(ConfirmService);
   private timer?: ReturnType<typeof setInterval>;
+  private clock?: ReturnType<typeof setInterval>;
 
   readonly presets = PRESETS;
   readonly exchangeTypes: ExchangeType[] = ['direct', 'topic', 'fanout', 'headers'];
@@ -117,6 +124,13 @@ export class MessagingComponent implements OnInit, OnDestroy {
   error = signal<string | null>(null);
   autoRefresh = signal(true);
   busy = signal(false);
+  tab = signal<Tab>('queues');
+  lastUpdated = signal<number | null>(null);
+  now = signal(Date.now());
+  secondsAgo = computed(() => {
+    const t = this.lastUpdated();
+    return t === null ? null : Math.max(0, Math.round((this.now() - t) / 1000));
+  });
 
   panel = signal<Panel>(null);
   formError = signal<string | null>(null);
@@ -146,6 +160,25 @@ export class MessagingComponent implements OnInit, OnDestroy {
   dlqs = computed(() => (this.queues() ?? []).filter((q) => q.deadLetterQueue));
   dlqTotal = computed(() => this.dlqs().reduce((n, q) => n + q.messagesReady, 0));
   pendingMain = computed(() => this.mainQueues().reduce((n, q) => n + q.messagesReady, 0));
+  /** Exchanges por los que entran los comandos (sin el de dead-letter). */
+  commandExchanges = computed(() => this.exchanges().filter((e) => !e.name.includes('dead') && !e.name.startsWith('amq.')));
+  deadLetterExchanges = computed(() => this.exchanges().filter((e) => e.name.includes('dead')));
+  bindingsByExchange = computed(() => {
+    const map = new Map<string, BindingInfo[]>();
+    for (const b of this.bindings()) {
+      if (!map.has(b.exchange)) map.set(b.exchange, []);
+      map.get(b.exchange)!.push(b);
+    }
+    return map;
+  });
+  dlqOf = computed(() => {
+    const byName = new Map((this.queues() ?? []).map((q) => [q.name, q]));
+    const map = new Map<string, QueueInfo | undefined>();
+    for (const q of this.mainQueues()) map.set(q.name, q.deadLetterRoutingKey ? byName.get(q.deadLetterRoutingKey) : undefined);
+    return map;
+  });
+  flowing = computed(() => (this.overview()?.consumers ?? 0) > 0 && !this.error());
+  maxMem = computed(() => Math.max(256, ...(this.overview()?.nodes ?? []).map((n) => n.memUsedMb)));
   runningNodes = computed(() => (this.overview()?.nodes ?? []).filter((n) => n.running).length);
   bindingsByQueue = computed(() => {
     const map = new Map<string, BindingInfo[]>();
@@ -159,10 +192,12 @@ export class MessagingComponent implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.load();
     this.timer = setInterval(() => this.autoRefresh() && !this.busy() && this.load(true), 5000);
+    this.clock = setInterval(() => this.now.set(Date.now()), 1000);
   }
 
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+    if (this.clock) clearInterval(this.clock);
   }
 
   load(silent = false): void {
@@ -179,6 +214,7 @@ export class MessagingComponent implements OnInit, OnDestroy {
         this.exchanges.set(r.exchanges);
         this.bindings.set(r.bindings);
         this.error.set(null);
+        this.lastUpdated.set(Date.now());
       },
       error: (err) => {
         this.error.set(problemMessage(err));
@@ -279,13 +315,22 @@ export class MessagingComponent implements OnInit, OnDestroy {
     });
   }
 
-  deleteQueue(q: QueueInfo): void {
-    if (!confirm(`¿Eliminar la cola ${q.name}${q.messagesReady ? ` y sus ${q.messagesReady} mensajes` : ''}?`)) return;
+  async deleteQueue(q: QueueInfo): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: `Eliminar ${q.name}`,
+      message: q.messagesReady ? `La cola tiene ${q.messagesReady} mensaje(s) que se perderán.` : 'La cola y sus bindings se eliminarán del clúster.',
+    });
+    if (!ok) return;
     this.run(this.rabbit.deleteQueue(q.name), () => this.toast.success(`Cola ${q.name} eliminada`));
   }
 
-  purge(q: QueueInfo): void {
-    if (!confirm(`¿Vaciar ${q.name}? Se eliminan ${q.messagesReady} mensaje(s).`)) return;
+  async purge(q: QueueInfo): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: `Vaciar ${q.name}`,
+      message: `Se eliminan ${q.messagesReady} mensaje(s) sin procesarlos.`,
+      confirmLabel: 'Vaciar cola',
+    });
+    if (!ok) return;
     this.run(this.rabbit.purgeQueue(q.name), (r) => this.toast.success(`${r.purged} mensaje(s) eliminados de ${r.queue}`));
   }
 
@@ -297,13 +342,17 @@ export class MessagingComponent implements OnInit, OnDestroy {
     });
   }
 
-  deleteExchange(e: ExchangeInfo): void {
-    if (!confirm(`¿Eliminar el exchange ${e.name}?`)) return;
+  async deleteExchange(e: ExchangeInfo): Promise<void> {
+    if (!(await this.confirm.ask({ title: `Eliminar exchange ${e.name}`, message: 'También se eliminan sus bindings.' }))) return;
     this.run(this.rabbit.deleteExchange(e.name), () => this.toast.success(`Exchange ${e.name} eliminado`));
   }
 
-  deleteBinding(b: BindingInfo): void {
-    if (!confirm(`¿Eliminar el binding ${b.exchange} → ${b.queue} [${b.routingKey}]?`)) return;
+  async deleteBinding(b: BindingInfo): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: 'Eliminar binding',
+      message: `${b.exchange} → ${b.queue} [${b.routingKey || '∅'}]. Los mensajes con esa clave dejarán de llegar a la cola.`,
+    });
+    if (!ok) return;
     this.run(this.rabbit.deleteBinding(b), () => this.toast.success('Binding eliminado'));
   }
 
@@ -319,6 +368,11 @@ export class MessagingComponent implements OnInit, OnDestroy {
     });
   }
 
+  onEscape(): void {
+    if (this.panel()) this.close();
+    else if (this.peekQueue()) this.closePeek();
+  }
+
   closePeek(): void {
     this.peekQueue.set(null);
     this.peeked.set(null);
@@ -330,6 +384,18 @@ export class MessagingComponent implements OnInit, OnDestroy {
     } catch {
       return payload;
     }
+  }
+
+  outcomeLabel(o: Preset['outcome']): string {
+    return o === 'ack' ? 'ACK' : o === 'retry' ? 'Reintento → ACK' : 'DLQ';
+  }
+
+  consumersArr(n: number): number[] {
+    return Array.from({ length: Math.min(Math.max(n, 1), 4) }, (_, i) => i);
+  }
+
+  memPct(mb: number): number {
+    return Math.min(100, Math.round((mb / this.maxMem()) * 100));
   }
 
   shortNode(node: string | null | undefined): string {
