@@ -3,11 +3,23 @@
     <div class="eyebrow"><app-icon name="chart" [size]="14" /> Análisis</div>
     <h1>Reportería de la red</h1>
     <p>
-      KPIs calculados en línea desde el microservicio de órdenes.
+      KPIs en tiempo real: <span class="code-pill">ms-digitalfix-report</span> consume
+      <span class="code-pill">workorders.events</span> (Kafka, grupo <span class="code-pill">report-kpis</span>) y
+      actualiza su proyección con cada evento, sin consultar al microservicio de órdenes.
       @if (kpis(); as k) { <span class="faint">Generado {{ fmt(k.generadoEn) }}</span> }
     </p>
   </div>
   <div class="actions">
+    @if (range() === 'last24h') {
+      <span class="live" aria-live="polite">
+        <span class="dot" [class.dot--on]="!error() && lastUpdated() !== null" [class.dot--pulse]="liveMode() && !error()"
+              [class.dot--off]="!!error()"></span>
+        @if (secondsAgo() === null) { conectando… } @else { actualizado hace {{ secondsAgo() }} s }
+      </span>
+      <label class="switch" title="Actualizar cada 4 segundos">
+        <input type="checkbox" [checked]="liveMode()" (change)="toggleLive($event)" /> En vivo
+      </label>
+    }
     <div class="segmented">
       <button [class.on]="range() === 'last24h'" (click)="setRange('last24h')">Últimas 24 h</button>
       <button [class.on]="range() === 'last7d'" (click)="setRange('last7d')">Últimos 7 días</button>
@@ -87,3 +99,91 @@
     </div>
   </div>
 </section>
+
+@if (range() === 'last24h' && live(); as l) {
+  <!-- ------------------------------------------------ Streaming en vivo (Kafka) -->
+  <section class="grid grid-main mt-lg fade-in">
+    <div class="card">
+      <div class="card-head">
+        <h3><app-icon name="activity" /> Eventos consumidos en vivo</h3>
+        <span class="chip chip--violet">{{ l.fuente }}</span>
+      </div>
+      <div class="table-wrap">
+        <table class="table table--stack">
+          <thead>
+            <tr><th>Orden</th><th>Evento</th><th>Nuevo estado</th><th>Actor</th><th class="num">Partición · offset</th><th>Hace</th></tr>
+          </thead>
+          <tbody>
+            @for (e of l.eventosRecientes; track key(e)) {
+              <tr [style.background]="freshKeys().has(key(e)) ? 'color-mix(in srgb, var(--green) 14%, transparent)' : null">
+                <td class="cell-main"><div class="title mono">#{{ e.workOrderId }}</div></td>
+                <td data-label="Evento"><span class="chip">{{ eventLabel(e.eventType) }}</span></td>
+                <td data-label="Nuevo estado">
+                  <span style="display:inline-flex;align-items:center;gap:6px">
+                    <span style="width:8px;height:8px;border-radius:50%" [style.background]="color(e.status)"></span>{{ label(e.status) }}
+                  </span>
+                </td>
+                <td data-label="Actor" class="muted" style="font-size:12.5px">{{ e.actor }} <span class="faint">· {{ e.role }}</span></td>
+                <td data-label="Partición · offset" class="num mono">P{{ e.partition }} · {{ e.offset }}</td>
+                <td data-label="Hace" class="faint" style="font-size:12.5px">{{ ago(e.receivedAt) }}</td>
+              </tr>
+            } @empty {
+              <tr><td colspan="6"><div class="empty"><span class="empty-icon"><app-icon name="activity" [size]="22" /></span>
+                <h4>Esperando eventos</h4><p>Crea o cambia el estado de una orden: aparecerá aquí en segundos.</p></div></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h3><app-icon name="shuffle" /> Consumo del grupo {{ l.consumerGroup }}</h3>
+      </div>
+      <div style="padding:4px 18px 18px">
+        <div class="faint" style="font-size:12.5px;margin-bottom:10px">
+          {{ l.consumo.eventosAplicados }} eventos aplicados · {{ l.consumo.duplicadosIgnorados }} duplicados ignorados (idempotencia)
+        </div>
+        @for (p of partitions(); track p.partition) {
+          <div style="margin-bottom:10px">
+            <div style="display:flex;justify-content:space-between;font-size:12.5px">
+              <strong class="mono">workorders.events-{{ p.partition }}</strong>
+              <span class="mono faint">{{ p.eventos }} ev · offset {{ p.ultimoOffset }}</span>
+            </div>
+            <div class="bar-track"><div class="bar-seg" [style.width.%]="p.pct"></div></div>
+          </div>
+        } @empty {
+          <div class="faint" style="font-size:12.5px">Sin eventos consumidos desde que arrancó el servicio.</div>
+        }
+        <p class="faint" style="font-size:12px;margin-top:12px">
+          Clave del mensaje = id de la orden: todos los eventos de una orden van a la misma partición y se procesan en orden.
+          Las 3 particiones se reparten entre los hilos (o instancias) del grupo.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="card mt-lg fade-in" [class.kpi--alert]="l.ordenesEnRiesgo.length > 0">
+    <div class="card-head">
+      <h3><app-icon name="alert" /> SLA en riesgo</h3>
+      <span class="chip chip--neutral">activas sin avanzar &gt; {{ l.slaMinutos }} min</span>
+    </div>
+    <div style="padding:4px 18px 18px">
+      @if (l.ordenesEnRiesgo.length) {
+        <div style="display:flex;flex-wrap:wrap;gap:8px">
+          @for (o of l.ordenesEnRiesgo; track o.ordenId) {
+            <span class="badge badge--danger" [title]="'Sin cambios desde ' + fmt(o.desde)">
+              #{{ o.ordenId }} · {{ label(o.estado) }} · {{ ago(o.desde) }}
+            </span>
+          }
+        </div>
+      } @else {
+        <div class="faint" style="font-size:12.5px">Todas las órdenes activas avanzan dentro del SLA.</div>
+      }
+      <p class="faint" style="font-size:12px;margin-top:10px">
+        Proceso automático derivado del streaming: el servicio revisa la proyección cada 30 s y marca la orden;
+        el siguiente evento de esa orden limpia la alerta.
+      </p>
+    </div>
+  </section>
+}

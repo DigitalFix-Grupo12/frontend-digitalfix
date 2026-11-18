@@ -2,7 +2,8 @@
   <div>
     <div class="eyebrow"><app-icon name="history" [size]="14" /> Análisis</div>
     <h1>Auditoría</h1>
-    <p>Timeline inmutable de cada acción realizada sobre las órdenes (solo lectura).</p>
+    <p>Timeline inmutable (solo lectura) alimentado por Kafka: <span class="code-pill">workorders.events</span> (hechos de las órdenes)
+      y <span class="code-pill">audit.timeline</span> (quién, qué, cuándo y desde dónde, incluidos accesos denegados).</p>
   </div>
   <div class="actions">
     <button class="btn btn--ghost" (click)="load()"><app-icon name="refresh" [size]="16" /> Actualizar</button>
@@ -68,6 +69,13 @@
                 <span style="display:inline-flex;align-items:center;gap:4px"><app-icon name="user" [size]="13" /> {{ e.usuario }}</span>
                 <span [title]="fmt(e.fecha)">{{ timeAgo(e.fecha) }} · {{ fmt(e.fecha) }}</span>
                 <span class="code-pill">{{ e.servicio }}</span>
+                @if (e.rolUsuario) { <span class="chip">{{ e.rolUsuario }}</span> }
+                @if (e.resultado === 'DENIED') { <span class="badge badge--danger">acceso denegado</span> }
+                @if (e.resultado === 'ERROR') { <span class="badge badge--danger">error</span> }
+                @if (e.ipOrigen) { <span class="code-pill" title="IP de origen (X-Forwarded-For del API Gateway)">IP {{ e.ipOrigen }}</span> }
+                @if (e.canal === 'KAFKA') {
+                  <span class="code-pill" [title]="'eventId ' + (e.eventId ?? '')">{{ e.topico }} · P{{ e.particion }} · offset {{ e.offsetKafka }}</span>
+                }
                 @if (orderId(e.referencia); as id) {
                   <a class="code-pill" [routerLink]="['/workorders', id]" style="text-decoration:none;color:var(--accent)">orden #{{ id }}</a>
                 }

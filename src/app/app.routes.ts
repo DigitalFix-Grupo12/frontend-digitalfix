@@ -11,6 +11,7 @@ import { ReportsComponent } from './pages/reports/reports.component';
 import { AuditComponent } from './pages/audit/audit.component';
 import { SessionComponent } from './pages/session/session.component';
 import { MessagingComponent } from './pages/messaging/messaging.component';
+import { StreamingComponent } from './pages/streaming/streaming.component';
 
 export const routes: Routes = [
   { path: 'login', component: LoginComponent, canActivate: [guestGuard], title: 'DigitalFix — Iniciar sesión' },
@@ -63,6 +64,13 @@ export const routes: Routes = [
     canActivate: [authGuard, roleGuard],
     title: 'DigitalFix — Mensajería',
     data: { roles: ['Admin'], title: 'Mensajería RabbitMQ' },
+  },
+  {
+    path: 'streaming',
+    component: StreamingComponent,
+    canActivate: [authGuard, roleGuard],
+    title: 'DigitalFix — Streaming',
+    data: { roles: ['Admin'], title: 'Streaming Kafka' },
   },
   {
     path: 'session',

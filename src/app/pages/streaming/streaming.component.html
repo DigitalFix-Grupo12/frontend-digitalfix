@@ -1,0 +1,362 @@
+<header class="page-head fade-in">
+  <div>
+    <div class="eyebrow"><app-icon name="zap" [size]="14" /> Plataforma de streaming</div>
+    <h1>Kafka</h1>
+    <p>3 ZooKeeper + 3 brokers · tópicos con 3 particiones × 3 réplicas. Administrado por
+      <span class="code-pill">ms-digitalfix-kafka-admin</span>.</p>
+  </div>
+  <div class="actions">
+    <span class="live" aria-live="polite">
+      <span class="dot" [class.dot--on]="!error() && lastUpdated() !== null" [class.dot--pulse]="autoRefresh() && !error()"
+            [class.dot--off]="!!error()"></span>
+      @if (secondsAgo() === null) { conectando… } @else { actualizado hace {{ secondsAgo() }} s }
+    </span>
+    <label class="switch" title="Actualizar cada 5 segundos">
+      <input type="checkbox" [checked]="autoRefresh()" (change)="autoRefresh.set(checked($event))" /> En vivo
+    </label>
+    <button class="btn btn--ghost" (click)="load()" aria-label="Actualizar ahora"><app-icon name="refresh" [size]="16" /></button>
+    <button class="btn btn--primary" (click)="openCreate()"><app-icon name="plus" [size]="16" /> Nuevo tópico</button>
+  </div>
+</header>
+
+@if (error()) {
+  <div class="alert alert--error" role="alert">
+    <app-icon name="alert" />
+    <div class="grow"><strong>No se pudo leer el clúster Kafka.</strong> {{ error() }}</div>
+    <button class="btn btn--ghost btn--sm" (click)="load()">Reintentar</button>
+  </div>
+}
+
+<!-- ----------------------------------------------------------------- KPIs -->
+<section class="grid grid-4 fade-in">
+  <div class="card kpi" [class.kpi--alert]="cluster() && brokersUp() < 3">
+    <div class="kpi-top"><span class="kpi-label">Brokers activos</span><span class="kpi-icon kpi-icon--green"><app-icon name="server" [size]="17" /></span></div>
+    <div class="kpi-value">{{ brokersUp() }}<small>/ 3</small></div>
+    <div class="kpi-sub">controlador: broker {{ cluster()?.controllerId ?? '—' }}</div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Tópicos</span><span class="kpi-icon kpi-icon--blue"><app-icon name="layers" [size]="17" /></span></div>
+    <div class="kpi-value">{{ appTopics().length }}</div>
+    <div class="kpi-sub">{{ underReplicated() ? underReplicated() + ' partición(es) sub-replicadas' : 'todas las réplicas en sincronía' }}</div>
+  </div>
+  <div class="card kpi">
+    <div class="kpi-top"><span class="kpi-label">Consumer groups</span><span class="kpi-icon kpi-icon--violet"><app-icon name="users" [size]="17" /></span></div>
+    <div class="kpi-value">{{ groups().length }}</div>
+    <div class="kpi-sub">{{ groups().length ? groups()[0].groupId + (groups().length > 1 ? ' y otros' : '') : 'sin consumidores' }}</div>
+  </div>
+  <div class="card kpi" [class.kpi--alert]="totalLag() > 0">
+    <div class="kpi-top"><span class="kpi-label">Lag total</span><span class="kpi-icon" [class.kpi-icon--amber]="totalLag() > 0"><app-icon name="clock" [size]="17" /></span></div>
+    <div class="kpi-value" [style.color]="totalLag() ? 'var(--amber)' : null">{{ totalLag() }}</div>
+    <div class="kpi-sub">{{ totalLag() ? 'eventos pendientes de procesar' : 'consumidores al día' }}</div>
+  </div>
+</section>
+
+<!-- --------------------------------------------------------------- Brokers -->
+<section class="card mt-lg fade-in">
+  <div class="card-head">
+    <h3><app-icon name="cpu" /> Clúster {{ cluster()?.clusterId ?? '' }}</h3>
+    <span class="faint hide-sm" style="font-size:12px">ZooKeeper (quórum 2 de 3) coordina líderes e ISR · RF 3 + min.insync 2 tolera 1 broker caído</span>
+  </div>
+  <div class="cluster">
+    @for (b of cluster()?.nodes ?? []; track b.id) {
+      <div class="cluster-node">
+        <span class="kpi-icon kpi-icon--green"><app-icon name="server" [size]="17" /></span>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;gap:8px">
+            <strong class="mono" style="font-size:13px">broker {{ b.id }}</strong>
+            @if (b.controller) { <span class="badge badge--done">controlador</span> } @else { <span class="badge">activo</span> }
+          </div>
+          <div class="faint mono" style="font-size:12px;margin-top:2px">{{ b.host }}:{{ b.port }}</div>
+        </div>
+      </div>
+    } @empty {
+      <div class="faint" style="padding:6px 0">Sin información del clúster.</div>
+    }
+  </div>
+</section>
+
+<!-- ------------------------------------------------- Topicos / consumer groups -->
+<section class="card mt-lg fade-in">
+  <div class="toolbar">
+    <div class="segmented" role="tablist" aria-label="Recursos de Kafka">
+      <button role="tab" [attr.aria-selected]="tab() === 'topics'" [class.on]="tab() === 'topics'" (click)="tab.set('topics')">
+        <app-icon name="layers" [size]="14" /> Tópicos <span class="count">{{ appTopics().length }}</span></button>
+      <button role="tab" [attr.aria-selected]="tab() === 'groups'" [class.on]="tab() === 'groups'" (click)="tab.set('groups')">
+        <app-icon name="users" [size]="14" /> Consumer groups <span class="count">{{ groups().length }}</span></button>
+    </div>
+    <div style="flex:1"></div>
+    @if (tab() === 'topics') {
+      <label class="switch" title="Incluir __consumer_offsets y otros internos">
+        <input type="checkbox" [checked]="showInternal()" (change)="toggleInternal($event)" /> Internos
+      </label>
+    }
+  </div>
+
+  @if (topics() === null) {
+    @for (i of [1, 2, 3]; track i) { <div class="skeleton sk-line"></div> }
+  } @else {
+    @switch (tab()) {
+      @case ('topics') {
+        <div class="table-wrap">
+          <table class="table table--stack">
+            <thead>
+              <tr><th>Tópico</th><th class="num">Particiones</th><th class="num">Réplicas</th><th class="num">Mensajes</th><th>Estado</th><th><span class="sr-only">Acciones</span></th></tr>
+            </thead>
+            <tbody>
+              @for (t of topics(); track t.name) {
+                <tr>
+                  <td class="cell-main">
+                    <div class="title mono">
+                      @if (t.protectedTopic) { <span title="Tópico del sistema (protegido)" class="faint"><app-icon name="lock" [size]="13" /></span> }
+                      {{ t.name }}
+                      @if (t.name.endsWith('.DLT')) { <span class="badge badge--danger">DLT</span> }
+                    </div>
+                    @if (role(t.name)) { <div class="sub"><span>{{ role(t.name) }}</span></div> }
+                  </td>
+                  <td data-label="Particiones" class="num mono">{{ t.partitions }}</td>
+                  <td data-label="Réplicas" class="num mono">{{ t.replicationFactor }}</td>
+                  <td data-label="Mensajes" class="num mono" [style.color]="t.name.endsWith('.DLT') && t.messages ? 'var(--red)' : null">{{ t.messages }}</td>
+                  <td data-label="Estado">
+                    @if (t.underReplicatedPartitions) {
+                      <span class="badge badge--danger">{{ t.underReplicatedPartitions }} sub-replicadas</span>
+                    } @else { <span class="badge badge--done">ISR completo</span> }
+                  </td>
+                  <td class="row-actions">
+                    <button class="icon-btn" (click)="openTopic(t.name)" title="Ver particiones y configuración" aria-label="Ver tópico"><app-icon name="eye" [size]="16" /></button>
+                    <button class="icon-btn icon-btn--danger" (click)="deleteTopic(t)" [disabled]="t.protectedTopic || busy()"
+                            [title]="t.protectedTopic ? 'Tópico del sistema: no se puede eliminar' : 'Eliminar'" aria-label="Eliminar tópico"><app-icon name="trash" [size]="16" /></button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="6"><div class="empty"><span class="empty-icon"><app-icon name="layers" [size]="22" /></span><h4>Sin tópicos</h4><p>Ejecuta kafka/scripts/topics.sh o crea uno desde aquí.</p></div></td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      @case ('groups') {
+        <div class="table-wrap">
+          <table class="table table--stack">
+            <thead><tr><th>Grupo</th><th>Estado</th><th class="num">Consumidores</th><th>Tópicos</th><th class="num">Lag</th><th><span class="sr-only">Acciones</span></th></tr></thead>
+            <tbody>
+              @for (g of groups(); track g.groupId) {
+                <tr>
+                  <td class="cell-main"><div class="title mono">{{ g.groupId }}</div></td>
+                  <td data-label="Estado">
+                    <span class="badge" [class.badge--done]="g.state === 'STABLE'" [class.badge--danger]="g.state === 'DEAD'">{{ g.state }}</span>
+                  </td>
+                  <td data-label="Consumidores" class="num mono">{{ g.members }}</td>
+                  <td data-label="Tópicos">
+                    <span style="display:inline-flex;flex-wrap:wrap;gap:4px">
+                      @for (tp of g.topics; track tp) { <span class="code-pill">{{ tp }}</span> }
+                    </span>
+                  </td>
+                  <td data-label="Lag" class="num mono" [style.color]="g.totalLag ? 'var(--amber)' : null">{{ g.totalLag }}</td>
+                  <td class="row-actions">
+                    <button class="icon-btn" (click)="openGroup(g.groupId)" title="Ver asignación de particiones y lag" aria-label="Ver grupo"><app-icon name="eye" [size]="16" /></button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="6"><div class="empty"><span class="empty-icon"><app-icon name="users" [size]="22" /></span><h4>Sin consumer groups</h4><p>Se registran cuando report y audit se conectan.</p></div></td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    }
+  }
+</section>
+
+<!-- ------------------------------------------------------------ Drawers -->
+@if (panel()) {
+  <div class="backdrop" (click)="close()"></div>
+}
+
+@if (panel(); as p) {
+  <aside class="drawer" style="width:min(680px,100%)" role="dialog" aria-modal="true" aria-labelledby="k-drawer-title">
+    <div class="drawer-head">
+      <h3 id="k-drawer-title">
+        @switch (p) {
+          @case ('create') { Nuevo tópico }
+          @case ('topic') { <span class="mono">{{ topic()?.name ?? 'Tópico' }}</span> }
+          @case ('group') { <span class="mono">{{ group()?.groupId ?? 'Consumer group' }}</span> }
+        }
+      </h3>
+      <button class="icon-btn" (click)="close()" aria-label="Cerrar"><app-icon name="x" /></button>
+    </div>
+
+    <div class="drawer-body form-grid">
+      @if (formError()) {
+        <div class="alert alert--error" role="alert"><app-icon name="alert" /><div>{{ formError() }}</div></div>
+      }
+
+      @switch (p) {
+        @case ('create') {
+          <div class="field"><label for="t-name">Nombre</label>
+            <input id="t-name" class="input mono" placeholder="analytics.orders" [value]="cName()" (input)="cName.set(val($event))" />
+            <span class="hint">Letras, números, . _ - · sin espacios</span></div>
+          <div class="grid grid-2">
+            <div class="field"><label for="t-part">Particiones (paralelismo)</label>
+              <input id="t-part" class="input" type="number" min="1" max="12" [value]="cPartitions()" (input)="cPartitions.set(num($event))" /></div>
+            <div class="field"><label for="t-rf">Réplicas (tolerancia a fallos)</label>
+              <input id="t-rf" class="input" type="number" min="1" max="3" [value]="cReplicas()" (input)="cReplicas.set(num($event))" /></div>
+          </div>
+          <div class="grid grid-2">
+            <div class="field"><label for="t-ret">Retención (horas)</label>
+              <input id="t-ret" class="input" inputmode="decimal" [value]="cRetentionH()" (input)="cRetentionH.set(val($event))" />
+              <span class="hint">168 h = 7 días</span></div>
+            <div class="field"><label for="t-clean">Cleanup policy</label>
+              <select id="t-clean" class="select" [value]="cCleanup()" (change)="cCleanup.set(val($event))">
+                <option value="delete">delete (borra por tiempo/tamaño)</option>
+                <option value="compact">compact (último valor por clave)</option>
+                <option value="compact,delete">compact,delete</option>
+              </select></div>
+          </div>
+          <p class="faint" style="font-size:12.5px">Con 2 o más réplicas se fija <span class="code-pill">min.insync.replicas=2</span>:
+            con <span class="code-pill">acks=all</span> una escritura se confirma cuando 2 brokers la tienen.</p>
+        }
+
+        @case ('topic') {
+          @if (topic(); as t) {
+            @if (t.note) { <div class="alert"><app-icon name="info" /><div>{{ t.note }}</div></div> }
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>Partición</th><th>Líder</th><th>Réplicas</th><th>ISR</th><th class="num">Offsets</th><th class="num">Mensajes</th></tr></thead>
+                <tbody>
+                  @for (pd of t.partitionDetails; track pd.partition) {
+                    <tr>
+                      <td class="mono">{{ pd.partition }}</td>
+                      <td class="mono"><span class="badge badge--done">broker {{ pd.leader }}</span></td>
+                      <td class="mono">{{ pd.replicas.join(', ') }}</td>
+                      <td class="mono" [style.color]="pd.isr.length < pd.replicas.length ? 'var(--red)' : null">{{ pd.isr.join(', ') }}</td>
+                      <td class="num mono">{{ pd.beginningOffset }}–{{ pd.endOffset }}</td>
+                      <td class="num mono">{{ pd.messages }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <h4 style="margin:6px 0 0">Configuración</h4>
+            <div style="display:flex;flex-wrap:wrap;gap:6px">
+              @for (c of t.configs; track c.name) {
+                <span class="code-pill" [title]="c.source">{{ c.name }} = {{ c.name === 'retention.ms' ? c.value + ' (' + human(c.value) + ')' : c.value }}</span>
+              }
+            </div>
+
+            <div class="grid grid-2">
+              <div class="field"><label for="e-ret">Retención (horas, -1 = sin límite)</label>
+                <input id="e-ret" class="input" inputmode="decimal" [value]="eRetentionH()" (input)="eRetentionH.set(val($event))" /></div>
+              <div class="field"><label for="e-clean">Cleanup policy</label>
+                <select id="e-clean" class="select" (change)="eCleanup.set(val($event))">
+                  <option value="delete" [selected]="eCleanup() === 'delete'">delete</option>
+                  <option value="compact" [selected]="eCleanup() === 'compact'">compact</option>
+                  <option value="compact,delete" [selected]="eCleanup() === 'compact,delete'">compact,delete</option>
+                </select></div>
+            </div>
+            <div class="grid grid-2">
+              <div class="field"><label for="e-isr">min.insync.replicas</label>
+                <input id="e-isr" class="input" type="number" min="1" [max]="t.replicationFactor" [value]="eMinIsr()" (input)="eMinIsr.set(val($event))" /></div>
+              <div class="field"><label for="e-part">Aumentar a (particiones)</label>
+                <div style="display:flex;gap:6px">
+                  <input id="e-part" class="input" type="number" [min]="t.partitions + 1" max="12" [value]="ePartitions()" (input)="ePartitions.set(num($event))"
+                         [disabled]="t.protectedTopic" />
+                  <button class="btn btn--ghost btn--sm" (click)="increasePartitions()" [disabled]="busy() || t.protectedTopic"
+                          [title]="t.protectedTopic ? 'Tópico del sistema: cambiar particiones rompería el orden por clave' : 'Aumentar particiones'">Aplicar</button>
+                </div></div>
+            </div>
+          } @else {
+            <div class="skeleton sk-block"></div>
+          }
+        }
+
+        @case ('group') {
+          @if (group(); as g) {
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+              <span class="badge" [class.badge--done]="g.state === 'STABLE'">{{ g.state }}</span>
+              <span class="chip">assignor {{ g.assignor || '—' }}</span>
+              <span class="chip">coordinador broker {{ g.coordinator }}</span>
+              <span class="chip" [class.chip--violet]="g.totalLag > 0">lag total {{ g.totalLag }}</span>
+            </div>
+
+            <h4 style="margin:6px 0 0">Consumidores y particiones asignadas</h4>
+            @for (m of g.members; track m.memberId) {
+              <div class="cluster-node" style="align-items:flex-start">
+                <span class="kpi-icon kpi-icon--violet"><app-icon name="user" [size]="16" /></span>
+                <div style="min-width:0;flex:1">
+                  <strong class="mono" style="font-size:12.5px">{{ m.clientId }}</strong>
+                  <div class="faint mono" style="font-size:11.5px">{{ m.host }}</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+                    @for (a of m.assignments; track a) { <span class="code-pill">{{ a }}</span> }
+                  </div>
+                </div>
+              </div>
+            } @empty {
+              <div class="faint" style="font-size:12.5px">Sin consumidores conectados (grupo detenido).</div>
+            }
+
+            <h4 style="margin:6px 0 0">Offsets y lag por partición</h4>
+            <div class="table-wrap">
+              <table class="table">
+                <thead><tr><th>Partición</th><th class="num">Confirmado</th><th class="num">Fin del log</th><th>Lag</th></tr></thead>
+                <tbody>
+                  @for (o of g.offsets; track o.topic + o.partition) {
+                    <tr>
+                      <td class="mono">{{ o.topic }}-{{ o.partition }}</td>
+                      <td class="num mono">{{ o.committedOffset < 0 ? '—' : o.committedOffset }}</td>
+                      <td class="num mono">{{ o.endOffset }}</td>
+                      <td style="min-width:120px">
+                        <div style="display:flex;align-items:center;gap:8px">
+                          <span class="mono" [style.color]="o.lag ? 'var(--amber)' : null">{{ o.lag }}</span>
+                          <div class="bar-track" style="flex:1;margin:0"><div class="bar-seg" [style.width.%]="(o.lag / maxLag()) * 100"></div></div>
+                        </div>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <h4 style="margin:6px 0 0">Mover offsets</h4>
+            <div class="grid grid-2">
+              <div class="field"><label for="r-strat">Estrategia</label>
+                <select id="r-strat" class="select" (change)="rStrategy.set($any(val($event)))">
+                  <option value="EARLIEST" [selected]="rStrategy() === 'EARLIEST'">EARLIEST · reprocesar lo retenido</option>
+                  <option value="LATEST" [selected]="rStrategy() === 'LATEST'">LATEST · saltar el atraso</option>
+                  <option value="TIMESTAMP" [selected]="rStrategy() === 'TIMESTAMP'">TIMESTAMP · desde una fecha</option>
+                </select></div>
+              <div class="field"><label for="r-topic">Tópico (opcional)</label>
+                <input id="r-topic" class="input mono" placeholder="todos los del grupo" [value]="rTopic()" (input)="rTopic.set(val($event))" /></div>
+            </div>
+            @if (rStrategy() === 'TIMESTAMP') {
+              <div class="field"><label for="r-ts">Desde</label>
+                <input id="r-ts" class="input" type="datetime-local" [value]="rTimestamp()" (input)="rTimestamp.set(val($event))" /></div>
+            }
+            @if (g.state !== 'EMPTY' && g.state !== 'DEAD') {
+              <span class="hint">Solo con el grupo detenido (estado EMPTY): detén el microservicio consumidor y vuelve a intentarlo.</span>
+            }
+          } @else {
+            <div class="skeleton sk-block"></div>
+          }
+        }
+      }
+    </div>
+
+    <div class="drawer-foot">
+      <button class="btn btn--ghost" (click)="close()">Cerrar</button>
+      @switch (p) {
+        @case ('create') {
+          <button class="btn btn--primary" (click)="createTopic()" [disabled]="busy() || !cName().trim()">Crear tópico</button>
+        }
+        @case ('topic') {
+          <button class="btn btn--primary" (click)="saveConfigs()" [disabled]="busy() || !topic()">Guardar configuración</button>
+        }
+        @case ('group') {
+          <button class="btn btn--primary" (click)="resetOffsets()"
+                  [disabled]="busy() || !group() || (group()!.state !== 'EMPTY' && group()!.state !== 'DEAD') || (rStrategy() === 'TIMESTAMP' && !rTimestamp())">
+            Mover offsets</button>
+        }
+      }
+    </div>
+  </aside>
+}
