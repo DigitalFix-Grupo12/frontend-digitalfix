@@ -10,6 +10,6 @@ export const tenantProfiles: TenantProfile[] = [
     tenantId: '4ad1987c-6ddd-48a8-ab99-6fb918e84464',
     spaClientId: 'ddf8e70d-db7d-489e-bc96-c1bfec7d8910',
     apiClientId: 'ed8785f9-fb12-437b-9816-1982aab623e7',
-    apiBaseUrl: 'https://7s6qn2mb8h.execute-api.us-east-1.amazonaws.com',
+    apiBaseUrl: 'https://9z8cdnl6z3.execute-api.us-east-1.amazonaws.com',
   },
 ];
